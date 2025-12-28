@@ -92,17 +92,18 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
     });
 
     try {
-      final ref = FirebaseDatabase.instance.ref('pelajar/${widget.pelajarData['id']}');
-      
+      final ref =
+          FirebaseDatabase.instance.ref('pelajar/${widget.pelajarData['id']}');
+
       final updates = {
         'email': _emailController.text.trim(),
         'phone': _phoneController.text.trim(),
       };
-      
+
       if (_namaController.text.trim().isNotEmpty) {
         updates['nama'] = _namaController.text.trim();
       }
-      
+
       if (_passwordController.text.isNotEmpty) {
         updates['password'] = _passwordController.text;
       }

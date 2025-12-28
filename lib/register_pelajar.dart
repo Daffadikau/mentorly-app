@@ -63,10 +63,11 @@ class _RegisterPageState extends State<RegisterPage> {
       final ref = FirebaseDatabase.instance.ref('pelajar');
       final newRef = ref.push();
 
+      final normalizedEmail = _email.text.trim().toLowerCase();
       final user = {
-        'email': _email.text,
+        'email': normalizedEmail,
         'password': _password.text,
-        'phone': _phone.text,
+        'phone': _phone.text.trim(),
         'created_at': DateTime.now().toIso8601String(),
       };
 

@@ -76,7 +76,7 @@ class _LoginAdminState extends State<LoginAdmin> {
     try {
       final ref = FirebaseDatabase.instance.ref('admin');
       final query = ref.orderByChild('username').equalTo(_username.text.trim());
-      
+
       final snapshot = await query.get().timeout(const Duration(seconds: 10));
 
       if (snapshot.exists) {

@@ -77,7 +77,7 @@ class _LoginMentorState extends State<LoginMentor> {
     try {
       final ref = FirebaseDatabase.instance.ref('mentor');
       final query = ref.orderByChild('email').equalTo(_email.text.trim());
-      
+
       final snapshot = await query.get().timeout(const Duration(seconds: 10));
 
       if (snapshot.exists) {

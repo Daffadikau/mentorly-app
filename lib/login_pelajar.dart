@@ -21,46 +21,26 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   int loginAttempts = 0;
 
-  @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
   bool validasi() {
     bool isValid = true;
-
     setState(() {
-      // Validasi email
-      if (_email.text.isEmpty) {
-        errorEmail = "Email tidak boleh kosong";
-        isValid = false;
-      } else if (!_email.text.contains("@") || !_email.text.contains(".")) {
-        errorEmail = "Format email tidak valid";
-        isValid = false;
-      } else if (_email.text.length > 100) {
-        errorEmail = "Email terlalu panjang";
+      final emailText = _email.text.trim();
+      final passText = _password.text;
+
+      if (emailText.isEmpty || !emailText.contains('@')) {
+        errorEmail = 'Email tidak valid';
         isValid = false;
       } else {
         errorEmail = null;
       }
 
-      // Validasi password
-      if (_password.text.isEmpty) {
-        errorPassword = "Password tidak boleh kosong";
-        isValid = false;
-      } else if (_password.text.length < 6) {
-        errorPassword = "Password minimal 6 karakter";
-        isValid = false;
-      } else if (_password.text.length > 50) {
-        errorPassword = "Password terlalu panjang";
+      if (passText.isEmpty || passText.length < 4) {
+        errorPassword = 'Password minimal 4 karakter';
         isValid = false;
       } else {
         errorPassword = null;
       }
     });
-
     return isValid;
   }
 
@@ -84,22 +64,73 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final ref = FirebaseDatabase.instance.ref('pelajar');
-      final query = ref.orderByChild('email').equalTo(_email.text.trim());
-      
-      final snapshot = await query.get().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception("Koneksi timeout");
-        },
-      );
+      final normalizedEmail = _email.text.trim().toLowerCase();
 
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>;
-        final firstEntry = data.entries.first;
-        final pelajarId = firstEntry.key;
-        final pelajarData = Map<String, dynamic>.from(firstEntry.value as Map);
+      // Try common email field names first
+      final emailKeys = ['email', 'itememail', 'user_email', 'email_address'];
+      MapEntry? matchEntry;
 
-        if (pelajarData['password'] == _password.text) {
+      for (var key in emailKeys) {
+        final query = ref.orderByChild(key).equalTo(normalizedEmail);
+        try {
+          final snapshot = await query.get().timeout(const Duration(seconds: 6));
+          if (snapshot.exists) {
+            final raw = snapshot.value;
+            if (raw is Map && raw.isNotEmpty) {
+              matchEntry = raw.entries.first;
+              break;
+            }
+          }
+        } catch (_) {
+          // ignore and try next key
+        }
+      }
+
+      // Fallback: scan all entries and compare any field that looks like email
+      if (matchEntry == null) {
+        try {
+          final allSnap = await ref.get().timeout(const Duration(seconds: 8));
+          if (allSnap.exists && allSnap.value is Map) {
+            final allMap = allSnap.value as Map<dynamic, dynamic>;
+            for (var e in allMap.entries) {
+              final entryVal = e.value;
+              if (entryVal is Map) {
+                for (var f in entryVal.entries) {
+                  final val = f.value;
+                  if (val is String) {
+                    if (val.trim().toLowerCase() == normalizedEmail) {
+                      matchEntry = e;
+                      break;
+                    }
+                  }
+                }
+              }
+              if (matchEntry != null) break;
+            }
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+
+      if (matchEntry == null) {
+        loginAttempts++;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Email atau password salah"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        final pelajarId = matchEntry.key;
+        final pelajarData = Map<String, dynamic>.from(matchEntry.value as Map);
+
+        final storedPassword = (pelajarData['password'] ?? pelajarData['itempassword'] ?? '').toString();
+        final inputPassword = _password.text;
+
+        if (storedPassword == inputPassword) {
           loginAttempts = 0;
           pelajarData['id'] = pelajarId;
 
@@ -133,16 +164,6 @@ class _LoginPageState extends State<LoginPage> {
               ),
             );
           }
-        }
-      } else {
-        loginAttempts++;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Email atau password salah"),
-              backgroundColor: Colors.red,
-            ),
-          );
         }
       }
     } catch (e) {
@@ -232,9 +253,7 @@ class _LoginPageState extends State<LoginPage> {
                   prefixIcon: const Icon(Icons.lock_outlined),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
                     ),
                     onPressed: () {
                       setState(() {

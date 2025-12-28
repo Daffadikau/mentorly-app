@@ -6,7 +6,8 @@ class DetailChatPage extends StatefulWidget {
   final Map<String, dynamic> mentorData;
   final Map<String, dynamic> pelajarData;
 
-  const DetailChatPage({super.key, required this.mentorData, required this.pelajarData});
+  const DetailChatPage(
+      {super.key, required this.mentorData, required this.pelajarData});
 
   @override
   _DetailChatPageState createState() => _DetailChatPageState();
@@ -65,25 +66,28 @@ class _DetailChatPageState extends State<DetailChatPage> {
       final query = ref
           .orderByChild('pelajar_id')
           .equalTo(widget.pelajarData['id'].toString());
-      
+
       final snapshot = await query.get().timeout(const Duration(seconds: 10));
 
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
         final messages = <Map<String, dynamic>>[];
-        
+
         data.forEach((key, value) {
           final msg = Map<String, dynamic>.from(value as Map);
           // Filter by mentor_id if needed
-          if (msg['mentor_id'].toString() == widget.mentorData['mentor_id'].toString()) {
+          if (msg['mentor_id'].toString() ==
+              widget.mentorData['mentor_id'].toString()) {
             messages.add(msg);
           }
         });
-        
+
         // Sort by timestamp
         messages.sort((a, b) {
-          final timeA = DateTime.tryParse(a['timestamp'] ?? '') ?? DateTime.now();
-          final timeB = DateTime.tryParse(b['timestamp'] ?? '') ?? DateTime.now();
+          final timeA =
+              DateTime.tryParse(a['timestamp'] ?? '') ?? DateTime.now();
+          final timeB =
+              DateTime.tryParse(b['timestamp'] ?? '') ?? DateTime.now();
           return timeA.compareTo(timeB);
         });
 
@@ -143,7 +147,8 @@ class _DetailChatPageState extends State<DetailChatPage> {
 
     if (message.length > 5000) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Pesan terlalu panjang (max 5000 karakter)")),
+        const SnackBar(
+            content: Text("Pesan terlalu panjang (max 5000 karakter)")),
       );
       return;
     }
@@ -270,7 +275,8 @@ class _DetailChatPageState extends State<DetailChatPage> {
             PopupMenuItem(
               child: ListTile(
                 leading: const Icon(Icons.refresh, size: 20),
-                title: const Text("Refresh Chat", style: TextStyle(fontSize: 14)),
+                title:
+                    const Text("Refresh Chat", style: TextStyle(fontSize: 14)),
                 contentPadding: EdgeInsets.zero,
                 onTap: () {
                   Navigator.pop(context);
@@ -415,8 +421,10 @@ class _DetailChatPageState extends State<DetailChatPage> {
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(12),
             topRight: const Radius.circular(12),
-            bottomLeft: isMe ? const Radius.circular(12) : const Radius.circular(0),
-            bottomRight: isMe ? const Radius.circular(0) : const Radius.circular(12),
+            bottomLeft:
+                isMe ? const Radius.circular(12) : const Radius.circular(0),
+            bottomRight:
+                isMe ? const Radius.circular(0) : const Radius.circular(12),
           ),
           boxShadow: [
             BoxShadow(

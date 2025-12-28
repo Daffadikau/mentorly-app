@@ -12,7 +12,8 @@ class TambahJadwalMentor extends StatefulWidget {
 }
 
 class _TambahJadwalMentorState extends State<TambahJadwalMentor> {
-  final TextEditingController _mataPelajaranController = TextEditingController();
+  final TextEditingController _mataPelajaranController =
+      TextEditingController();
 
   String selectedHari = 'Senin';
   TimeOfDay? jamMulai;
@@ -152,7 +153,8 @@ class _TambahJadwalMentorState extends State<TambahJadwalMentor> {
       appBar: AppBar(
         backgroundColor: Colors.blue[700],
         elevation: 0,
-        title: const Text("Tambah Jadwal", style: TextStyle(color: Colors.white)),
+        title:
+            const Text("Tambah Jadwal", style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -358,7 +360,8 @@ class _TambahJadwalMentorState extends State<TambahJadwalMentor> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: const Text("Batal", style: TextStyle(fontSize: 16)),
+                      child:
+                          const Text("Batal", style: TextStyle(fontSize: 16)),
                     ),
                   ),
                 ),
