@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "282188392920",
+    "firebase_url": "https://mentorly-66d07-default-rtdb.firebaseio.com",
+    "project_id": "mentorly-66d07",
+    "storage_bucket": "mentorly-66d07.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:282188392920:android:3d405aa2334acd9e02aaad",
+        "android_client_info": {
+          "package_name": "com.example.mentorly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvItHyHz6Zju65VkRnyLStcdhdsaFKpWI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
