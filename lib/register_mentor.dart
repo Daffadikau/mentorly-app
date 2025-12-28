@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 import 'verifikasi_pending.dart';
 
 class RegisterMentor extends StatefulWidget {
@@ -25,6 +25,12 @@ class _RegisterMentorState extends State<RegisterMentor> {
   bool isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+
+  // File upload variables
+  String? _selectedPendidikan;
+  String? _selectedKTP;
+  String? _selectedSKCK;
+  String? _selectedSertifikat;
 
   @override
   void dispose() {
@@ -242,13 +248,13 @@ class _RegisterMentorState extends State<RegisterMentor> {
               TextInputType.url,
             ),
             const SizedBox(height: 15),
-            _buildFileUpload("Hasil Pendidikan Terakhir (Pdf, file)"),
+            _buildFileUpload("Hasil Pendidikan Terakhir (Pdf, file)", "pendidikan"),
             const SizedBox(height: 15),
-            _buildFileUpload("KTP (Pdf, file)"),
+            _buildFileUpload("KTP (Pdf, file)", "ktp"),
             const SizedBox(height: 15),
-            _buildFileUpload("SKCK (Scan Keterangan Catatan Kepolisian)"),
+            _buildFileUpload("SKCK (Scan Keterangan Catatan Kepolisian)", "skck"),
             const SizedBox(height: 15),
-            _buildFileUpload("Sertifikat (*opsional)"),
+            _buildFileUpload("Sertifikat (*opsional)", "sertifikat"),
             const SizedBox(height: 30),
             SizedBox(
               width: double.infinity,
@@ -360,27 +366,90 @@ class _RegisterMentorState extends State<RegisterMentor> {
     );
   }
 
-  Widget _buildFileUpload(String label) {
+  Widget _buildFileUpload(String label, String fileType) {
+    String? selectedFile;
+    
+    // Get the selected file for this type
+    switch (fileType) {
+      case "pendidikan":
+        selectedFile = _selectedPendidikan;
+        break;
+      case "ktp":
+        selectedFile = _selectedKTP;
+        break;
+      case "skck":
+        selectedFile = _selectedSKCK;
+        break;
+      case "sertifikat":
+        selectedFile = _selectedSertifikat;
+        break;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 5),
-        Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.attach_file, color: Colors.grey),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text("Add Media", style: TextStyle(color: Colors.grey)),
+        GestureDetector(
+          onTap: () async {
+            FilePickerResult? result = await FilePicker.platform.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+            );
+
+            if (result != null) {
+              setState(() {
+                switch (fileType) {
+                  case "pendidikan":
+                    _selectedPendidikan = result.files.single.name;
+                    break;
+                  case "ktp":
+                    _selectedKTP = result.files.single.name;
+                    break;
+                  case "skck":
+                    _selectedSKCK = result.files.single.name;
+                    break;
+                  case "sertifikat":
+                    _selectedSertifikat = result.files.single.name;
+                    break;
+                }
+              });
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: selectedFile != null ? Colors.green : Colors.grey,
               ),
-              Icon(Icons.upload_file, color: Colors.grey),
-            ],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.attach_file,
+                  color: selectedFile != null ? Colors.green : Colors.grey,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    selectedFile ?? "Add Media",
+                    style: TextStyle(
+                      color: selectedFile != null ? Colors.black : Colors.grey,
+                      fontWeight: selectedFile != null
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(
+                  Icons.upload_file,
+                  color: selectedFile != null ? Colors.green : Colors.grey,
+                ),
+              ],
+            ),
           ),
         ),
       ],

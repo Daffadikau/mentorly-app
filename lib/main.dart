@@ -20,7 +20,7 @@ class MentorlyApp extends StatelessWidget {
       title: 'Mentorly',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Roboto'),
-      home: SplashScreen(),
+      home: const SplashScreen(),
     );
   }
 }

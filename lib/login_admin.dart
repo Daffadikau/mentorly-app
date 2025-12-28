@@ -74,18 +74,107 @@ class _LoginAdminState extends State<LoginAdmin> {
     });
 
     try {
-      final ref = FirebaseDatabase.instance.ref('admin');
-      final query = ref.orderByChild('username').equalTo(_username.text.trim());
+      final candidatePaths = ['admin', 'admins', 'users', 'user', 'administrator', 'admins_list'];
+      final normalizedInput = _username.text.trim().toLowerCase();
+      final keys = ['username', 'user', 'name', 'email', 'itemusername', 'nama'];
+      MapEntry? matchEntry;
+      Map<String, dynamic>? matchDataFromList;
+      final triedPaths = <String>[];
 
-      final snapshot = await query.get().timeout(const Duration(seconds: 10));
+      for (var path in candidatePaths) {
+        triedPaths.add(path);
+        final ref = FirebaseDatabase.instance.ref(path);
 
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>;
-        final firstEntry = data.entries.first;
-        final adminId = firstEntry.key;
-        final adminData = Map<String, dynamic>.from(firstEntry.value as Map);
+        // try keyed queries first (for Map structures)
+        for (var key in keys) {
+          final query = ref.orderByChild(key).equalTo(normalizedInput);
+          try {
+            final snapshot = await query.get().timeout(const Duration(seconds: 4));
+            if (snapshot.exists) {
+              final raw = snapshot.value;
+              if (raw is Map && raw.isNotEmpty) {
+                matchEntry = raw.entries.first;
+                break;
+              }
+            }
+          } catch (_) {
+            // ignore and try next key
+          }
+        }
+        if (matchEntry != null) break;
 
-        if (adminData['password'] == _password.text) {
+        // fallback: scan Map entries and compare any string field
+        try {
+          final allSnap = await ref.get().timeout(const Duration(seconds: 6));
+          if (allSnap.exists && allSnap.value is Map) {
+            final allMap = allSnap.value as Map<dynamic, dynamic>;
+            for (var e in allMap.entries) {
+              final entryVal = e.value;
+              if (entryVal is Map) {
+                for (var f in entryVal.entries) {
+                  final val = f.value;
+                  if (val is String && val.trim().toLowerCase() == normalizedInput) {
+                    matchEntry = e;
+                    break;
+                  }
+                }
+              }
+              if (matchEntry != null) break;
+            }
+          }
+        } catch (_) {
+          // ignore
+        }
+
+        if (matchEntry != null) break;
+
+        // fallback: handle List structures (iterate and match)
+        try {
+          final listSnap = await ref.get().timeout(const Duration(seconds: 6));
+          if (listSnap.exists && listSnap.value is List) {
+            final adminList = listSnap.value as List<dynamic>;
+            for (var i = 0; i < adminList.length; i++) {
+              final item = adminList[i];
+              if (item is Map) {
+                for (var f in (item as Map).entries) {
+                  final val = f.value;
+                  if (val is String && val.trim().toLowerCase() == normalizedInput) {
+                    matchDataFromList = Map<String, dynamic>.from(item as Map);
+                    matchDataFromList!['_index'] = i;
+                    break;
+                  }
+                }
+              }
+              if (matchDataFromList != null) break;
+            }
+          }
+        } catch (_) {
+          // ignore
+        }
+
+        if (matchEntry != null || matchDataFromList != null) break;
+      }
+
+      if (matchEntry == null && matchDataFromList == null) {
+        // No match found anywhere
+        loginAttempts++;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Username atau password salah. Paths tried: ${triedPaths.join(', ')}"),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      } else if (matchEntry != null) {
+        // Match found in Map structure
+        final adminId = matchEntry.key;
+        final adminData = Map<String, dynamic>.from(matchEntry.value as Map);
+
+        final storedPassword = (adminData['password'] ?? adminData['itempassword'] ?? '').toString();
+
+        if (storedPassword == _password.text) {
           loginAttempts = 0;
           adminData['id'] = adminId;
 
@@ -119,14 +208,44 @@ class _LoginAdminState extends State<LoginAdmin> {
           }
         }
       } else {
-        loginAttempts++;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Username atau password salah"),
-              backgroundColor: Colors.red,
-            ),
+        // Match found in List structure
+        final adminData = matchDataFromList!;
+        final index = adminData.remove('_index');
+
+        final storedPassword = (adminData['password'] ?? adminData['itempassword'] ?? '').toString();
+
+        if (storedPassword == _password.text) {
+          loginAttempts = 0;
+          adminData['id'] = index;
+
+          await SessionManager.saveSession(
+            userType: 'admin',
+            userData: adminData,
           );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Login Berhasil!"),
+                backgroundColor: Colors.green,
+              ),
+            );
+
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => DashboardAdmin()),
+            );
+          }
+        } else {
+          loginAttempts++;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Username atau password salah"),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       }
     } catch (e) {

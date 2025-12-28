@@ -75,17 +75,89 @@ class _LoginMentorState extends State<LoginMentor> {
     });
 
     try {
-      final ref = FirebaseDatabase.instance.ref('mentor');
-      final query = ref.orderByChild('email').equalTo(_email.text.trim());
+      final String normalizedEmail = _email.text.trim().toLowerCase();
+      final String enteredPassword = _password.text;
+      
+      // Try multiple mentor data paths
+      List<String> candidatePaths = ['mentor', 'mentors', 'users', 'mentor_list'];
+      dynamic matchData;
+      String? mentorId;
+      Map<String, dynamic>? mentorData;
 
-      final snapshot = await query.get().timeout(const Duration(seconds: 10));
+      for (String path in candidatePaths) {
+        try {
+          final ref = FirebaseDatabase.instance.ref(path);
+          
+          // Try querying by email field
+          try {
+            final query = ref.orderByChild('email').equalTo(normalizedEmail);
+            final snapshot = await query.get().timeout(const Duration(seconds: 5));
+            
+            if (snapshot.exists && snapshot.value is Map) {
+              final data = snapshot.value as Map<dynamic, dynamic>;
+              final firstEntry = data.entries.first;
+              mentorId = firstEntry.key as String;
+              mentorData = Map<String, dynamic>.from(firstEntry.value as Map);
+              matchData = mentorData;
+              break;
+            }
+          } catch (e) {
+            // Query by email failed, try scanning all records
+          }
+          
+          // Fallback: scan all records for matching email
+          if (mentorId == null) {
+            final snapshot = await ref.get().timeout(const Duration(seconds: 5));
+            
+            if (snapshot.exists) {
+              final data = snapshot.value;
+              
+              if (data is Map<dynamic, dynamic>) {
+                // Try to find by scanning entries
+                for (var entry in data.entries) {
+                  final record = entry.value;
+                  if (record is Map) {
+                    String? recordEmail;
+                    
+                    // Try different email field names
+                    if (record['email'] != null) {
+                      recordEmail = record['email'].toString().trim().toLowerCase();
+                    } else if (record['itememail'] != null) {
+                      recordEmail = record['itememail'].toString().trim().toLowerCase();
+                    }
+                    
+                    if (recordEmail == normalizedEmail) {
+                      mentorId = entry.key as String;
+                      mentorData = Map<String, dynamic>.from(record as Map);
+                      matchData = mentorData;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
+          if (mentorId != null) break;
+        } catch (e) {
+          continue;
+        }
+      }
 
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>;
-        final firstEntry = data.entries.first;
-        final mentorId = firstEntry.key;
-        final mentorData = Map<String, dynamic>.from(firstEntry.value as Map);
+      // Debug: Show what paths were checked
+      if (mentorId == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Debug: Email not found in mentor records. Checked paths: ${candidatePaths.join(', ')}"),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
+      }
 
+      if (matchData != null && mentorData != null) {
         if (mentorData['status_verifikasi'] != 'verified') {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -102,7 +174,15 @@ class _LoginMentorState extends State<LoginMentor> {
           return;
         }
 
-        if (mentorData['password'] == _password.text) {
+        // Check password with fallback field names
+        String? storedPassword;
+        if (mentorData['password'] != null) {
+          storedPassword = mentorData['password'];
+        } else if (mentorData['itempassword'] != null) {
+          storedPassword = mentorData['itempassword'];
+        }
+
+        if (storedPassword == enteredPassword) {
           loginAttempts = 0;
           mentorData['mentor_id'] = mentorId;
 
@@ -122,7 +202,7 @@ class _LoginMentorState extends State<LoginMentor> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => DashboardMentor(mentorData: mentorData),
+                builder: (context) => DashboardMentor(mentorData: mentorData!),
               ),
             );
           }
