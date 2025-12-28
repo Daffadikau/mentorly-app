@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dashboard_admin.dart';
-import 'session_manager.dart';
+import '../utils/session_manager.dart';
 
 class LoginAdmin extends StatefulWidget {
   const LoginAdmin({super.key});
@@ -74,9 +74,23 @@ class _LoginAdminState extends State<LoginAdmin> {
     });
 
     try {
-      final candidatePaths = ['admin', 'admins', 'users', 'user', 'administrator', 'admins_list'];
+      final candidatePaths = [
+        'admin',
+        'admins',
+        'users',
+        'user',
+        'administrator',
+        'admins_list'
+      ];
       final normalizedInput = _username.text.trim().toLowerCase();
-      final keys = ['username', 'user', 'name', 'email', 'itemusername', 'nama'];
+      final keys = [
+        'username',
+        'user',
+        'name',
+        'email',
+        'itemusername',
+        'nama'
+      ];
       MapEntry? matchEntry;
       Map<String, dynamic>? matchDataFromList;
       final triedPaths = <String>[];
@@ -89,7 +103,8 @@ class _LoginAdminState extends State<LoginAdmin> {
         for (var key in keys) {
           final query = ref.orderByChild(key).equalTo(normalizedInput);
           try {
-            final snapshot = await query.get().timeout(const Duration(seconds: 4));
+            final snapshot =
+                await query.get().timeout(const Duration(seconds: 4));
             if (snapshot.exists) {
               final raw = snapshot.value;
               if (raw is Map && raw.isNotEmpty) {
@@ -113,7 +128,8 @@ class _LoginAdminState extends State<LoginAdmin> {
               if (entryVal is Map) {
                 for (var f in entryVal.entries) {
                   final val = f.value;
-                  if (val is String && val.trim().toLowerCase() == normalizedInput) {
+                  if (val is String &&
+                      val.trim().toLowerCase() == normalizedInput) {
                     matchEntry = e;
                     break;
                   }
@@ -136,11 +152,12 @@ class _LoginAdminState extends State<LoginAdmin> {
             for (var i = 0; i < adminList.length; i++) {
               final item = adminList[i];
               if (item is Map) {
-                for (var f in (item as Map).entries) {
+                for (var f in (item).entries) {
                   final val = f.value;
-                  if (val is String && val.trim().toLowerCase() == normalizedInput) {
-                    matchDataFromList = Map<String, dynamic>.from(item as Map);
-                    matchDataFromList!['_index'] = i;
+                  if (val is String &&
+                      val.trim().toLowerCase() == normalizedInput) {
+                    matchDataFromList = Map<String, dynamic>.from(item);
+                    matchDataFromList['_index'] = i;
                     break;
                   }
                 }
@@ -161,7 +178,8 @@ class _LoginAdminState extends State<LoginAdmin> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("Username atau password salah. Paths tried: ${triedPaths.join(', ')}"),
+              content: Text(
+                  "Username atau password salah. Paths tried: ${triedPaths.join(', ')}"),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 5),
             ),
@@ -172,7 +190,9 @@ class _LoginAdminState extends State<LoginAdmin> {
         final adminId = matchEntry.key;
         final adminData = Map<String, dynamic>.from(matchEntry.value as Map);
 
-        final storedPassword = (adminData['password'] ?? adminData['itempassword'] ?? '').toString();
+        final storedPassword =
+            (adminData['password'] ?? adminData['itempassword'] ?? '')
+                .toString();
 
         if (storedPassword == _password.text) {
           loginAttempts = 0;
@@ -193,7 +213,7 @@ class _LoginAdminState extends State<LoginAdmin> {
 
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => DashboardAdmin()),
+              MaterialPageRoute(builder: (context) => const DashboardAdmin()),
             );
           }
         } else {
@@ -212,7 +232,9 @@ class _LoginAdminState extends State<LoginAdmin> {
         final adminData = matchDataFromList!;
         final index = adminData.remove('_index');
 
-        final storedPassword = (adminData['password'] ?? adminData['itempassword'] ?? '').toString();
+        final storedPassword =
+            (adminData['password'] ?? adminData['itempassword'] ?? '')
+                .toString();
 
         if (storedPassword == _password.text) {
           loginAttempts = 0;
@@ -233,7 +255,7 @@ class _LoginAdminState extends State<LoginAdmin> {
 
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => DashboardAdmin()),
+              MaterialPageRoute(builder: (context) => const DashboardAdmin()),
             );
           }
         } else {

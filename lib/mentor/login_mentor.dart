@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'register_mentor.dart';
 import 'dashboard_mentor.dart';
-import 'session_manager.dart';
+import '../utils/session_manager.dart';
 
 class LoginMentor extends StatefulWidget {
   const LoginMentor({super.key});
@@ -75,164 +76,184 @@ class _LoginMentorState extends State<LoginMentor> {
     });
 
     try {
-      final String normalizedEmail = _email.text.trim().toLowerCase();
-      final String enteredPassword = _password.text;
-      
-      // Try multiple mentor data paths
-      List<String> candidatePaths = ['mentor', 'mentors', 'users', 'mentor_list'];
-      dynamic matchData;
-      String? mentorId;
-      Map<String, dynamic>? mentorData;
+      // Firebase Auth login
+      final userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _email.text.trim().toLowerCase(),
+        password: _password.text,
+      );
 
-      for (String path in candidatePaths) {
-        try {
-          final ref = FirebaseDatabase.instance.ref(path);
-          
-          // Try querying by email field
-          try {
-            final query = ref.orderByChild('email').equalTo(normalizedEmail);
-            final snapshot = await query.get().timeout(const Duration(seconds: 5));
-            
-            if (snapshot.exists && snapshot.value is Map) {
-              final data = snapshot.value as Map<dynamic, dynamic>;
-              final firstEntry = data.entries.first;
-              mentorId = firstEntry.key as String;
-              mentorData = Map<String, dynamic>.from(firstEntry.value as Map);
-              matchData = mentorData;
-              break;
-            }
-          } catch (e) {
-            // Query by email failed, try scanning all records
-          }
-          
-          // Fallback: scan all records for matching email
-          if (mentorId == null) {
-            final snapshot = await ref.get().timeout(const Duration(seconds: 5));
-            
-            if (snapshot.exists) {
-              final data = snapshot.value;
-              
-              if (data is Map<dynamic, dynamic>) {
-                // Try to find by scanning entries
-                for (var entry in data.entries) {
-                  final record = entry.value;
-                  if (record is Map) {
-                    String? recordEmail;
-                    
-                    // Try different email field names
-                    if (record['email'] != null) {
-                      recordEmail = record['email'].toString().trim().toLowerCase();
-                    } else if (record['itememail'] != null) {
-                      recordEmail = record['itememail'].toString().trim().toLowerCase();
-                    }
-                    
-                    if (recordEmail == normalizedEmail) {
-                      mentorId = entry.key as String;
-                      mentorData = Map<String, dynamic>.from(record as Map);
-                      matchData = mentorData;
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-          }
-          
-          if (mentorId != null) break;
-        } catch (e) {
-          continue;
-        }
-      }
+      final uid = userCredential.user!.uid;
+      final user = userCredential.user!;
 
-      // Debug: Show what paths were checked
-      if (mentorId == null) {
+      // Check if email is verified
+      if (!user.emailVerified) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Debug: Email not found in mentor records. Checked paths: ${candidatePaths.join(', ')}"),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 6),
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text("Verifikasi Diperlukan"),
+              content: const Text(
+                  "Email Anda belum terverifikasi.\n\n1. Cek Inbox/Spam email Anda.\n2. Klik link verifikasi.\n3. Kembali ke sini dan tekan tombol di bawah."),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    // Resend verification email
+                    try {
+                      await user.sendEmailVerification();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text("Email verifikasi dikirim ulang!")),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Gagal mengirim ulang: $e")),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text("Kirim Ulang"),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await FirebaseAuth.instance.signOut();
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: const Text("Batal"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await user.reload();
+                    if (FirebaseAuth.instance.currentUser?.emailVerified ==
+                        true) {
+                      if (context.mounted) Navigator.pop(context);
+                    } else {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                "Belum terverifikasi. Silakan cek email lagi."),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text("Saya Sudah Verifikasi"),
+                ),
+              ],
             ),
           );
+
+          // Re-check after dialog closes
+          await user.reload();
+          if (FirebaseAuth.instance.currentUser?.emailVerified != true) {
+            await FirebaseAuth.instance.signOut();
+            if (mounted) {
+              setState(() {
+                isLoading = false;
+              });
+            }
+            return;
+          }
         }
       }
 
-      if (matchData != null && mentorData != null) {
-        if (mentorData['status_verifikasi'] != 'verified') {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Akun Anda masih dalam proses verifikasi"),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 4),
-              ),
-            );
-          }
-          setState(() {
-            isLoading = false;
-          });
-          return;
-        }
+      // Fetch mentor profile from RTDB
+      final ref = FirebaseDatabase.instance.ref('mentor').child(uid);
+      final snapshot = await ref.get();
 
-        // Check password with fallback field names
-        String? storedPassword;
-        if (mentorData['password'] != null) {
-          storedPassword = mentorData['password'];
-        } else if (mentorData['itempassword'] != null) {
-          storedPassword = mentorData['itempassword'];
-        }
+      if (!snapshot.exists) {
+        // Profile doesn't exist, create basic profile
+        final profileData = {
+          'email': _email.text.trim().toLowerCase(),
+          'uid': uid,
+          'created_at': DateTime.now().toIso8601String(),
+          'status_verifikasi': 'pending',
+        };
+        await ref.set(profileData);
+      }
 
-        if (storedPassword == enteredPassword) {
-          loginAttempts = 0;
-          mentorData['mentor_id'] = mentorId;
+      final mentorData =
+          Map<String, dynamic>.from(snapshot.value as Map? ?? {});
+      mentorData['id'] = uid;
+      mentorData['uid'] = uid;
 
-          await SessionManager.saveSession(
-            userType: 'mentor',
-            userData: mentorData,
-          );
+      // Check verification status
+      if (mentorData['status_verifikasi'] != 'verified') {
+        await FirebaseAuth.instance.signOut();
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Login Berhasil!"),
-                backgroundColor: Colors.green,
-              ),
-            );
-
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DashboardMentor(mentorData: mentorData!),
-              ),
-            );
-          }
-        } else {
-          loginAttempts++;
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Email atau password salah"),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      } else {
-        loginAttempts++;
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Email atau password salah"),
-              backgroundColor: Colors.red,
+              content: Text("Akun Anda masih dalam proses verifikasi"),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 4),
             ),
           );
         }
+        setState(() {
+          isLoading = false;
+        });
+        return;
       }
-    } catch (e) {
+
+      loginAttempts = 0;
+
+      await SessionManager.saveSession(
+        userType: 'mentor',
+        userData: mentorData,
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Koneksi gagal. Periksa internet Anda."),
+            content: Text("Login Berhasil!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DashboardMentor(mentorData: mentorData),
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      loginAttempts++;
+      String errorMessage = "Email atau password salah";
+
+      if (e.code == 'user-not-found') {
+        errorMessage = "Akun tidak ditemukan";
+      } else if (e.code == 'wrong-password') {
+        errorMessage = "Password salah";
+      } else if (e.code == 'too-many-requests') {
+        errorMessage = "Terlalu banyak percobaan. Coba lagi nanti.";
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = "Koneksi gagal. Periksa internet Anda.";
+        if (e.toString().contains("timeout")) {
+          errorMessage = "Koneksi timeout. Coba lagi.";
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
           ),
         );
@@ -362,7 +383,7 @@ class _LoginMentorState extends State<LoginMentor> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => RegisterMentor(),
+                          builder: (context) => const RegisterMentor(),
                         ),
                       );
                     },

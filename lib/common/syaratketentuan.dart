@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'register_mentor.dart';
+import '../mentor/register_mentor.dart';
 
 class SyaratKetentuan extends StatefulWidget {
   const SyaratKetentuan({super.key});
@@ -171,7 +171,7 @@ class _SyaratKetentuanState extends State<SyaratKetentuan> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => RegisterMentor(),
+                                builder: (context) => const RegisterMentor(),
                               ),
                             );
                           }

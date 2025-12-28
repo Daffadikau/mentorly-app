@@ -3,10 +3,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'detail_mentor_pelajar.dart';
 import 'history_pelajar.dart';
-import 'list_chat_page.dart';
+import '../common/list_chat_page.dart';
 import 'profile_pelajar.dart';
-import 'welcome_page.dart';
-import 'session_manager.dart';
+import '../common/welcome_page.dart';
+import '../utils/session_manager.dart';
 
 class DashboardPelajar extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -173,7 +173,7 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                           Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => WelcomePage(),
+                              builder: (context) => const WelcomePage(),
                             ),
                             (route) => false,
                           );

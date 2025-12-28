@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'welcome_page.dart';
-import 'session_manager.dart';
+import '../common/welcome_page.dart';
+import '../utils/session_manager.dart';
 
 class ProfilePelajar extends StatefulWidget {
   final Map<String, dynamic> pelajarData;
@@ -451,7 +451,7 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) => WelcomePage()),
+                                  builder: (context) => const WelcomePage()),
                               (route) => false,
                             );
                           }

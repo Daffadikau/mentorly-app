@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'review_mentor.dart';
+import '../mentor/review_mentor.dart';
 
 class DetailRiwayat extends StatelessWidget {
   final Map<String, dynamic> bookingData;
@@ -19,7 +19,8 @@ class DetailRiwayat extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.blue[700],
         elevation: 0,
-        title: const Text("Detail Riwayat", style: TextStyle(color: Colors.white)),
+        title:
+            const Text("Detail Riwayat", style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -69,7 +70,8 @@ class DetailRiwayat extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),

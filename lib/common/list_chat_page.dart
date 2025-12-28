@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'chat_detail.dart';
-import 'session_manager.dart';
+import '../utils/session_manager.dart';
 
 class ListChatPage extends StatefulWidget {
   final Map<String, dynamic> pelajarData;

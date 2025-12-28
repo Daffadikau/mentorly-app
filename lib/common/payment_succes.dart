@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dashboard_pelajar.dart';
-import 'history_pelajar.dart';
+import '../pelajar/dashboard_pelajar.dart';
+import '../pelajar/history_pelajar.dart';
 
 class PaymentSuccess extends StatelessWidget {
   final String mentorName;
@@ -8,7 +8,8 @@ class PaymentSuccess extends StatelessWidget {
   final double totalBiaya;
   final Map<String, dynamic> jadwalData;
 
-  const PaymentSuccess({super.key, 
+  const PaymentSuccess({
+    super.key,
     required this.mentorName,
     required this.pelajarData,
     required this.totalBiaya,
@@ -98,8 +99,8 @@ class PaymentSuccess extends StatelessWidget {
                       _buildInfoRow(Icons.access_time, jadwalData['waktu']),
                       const SizedBox(height: 15),
                       Container(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 20),
                         decoration: BoxDecoration(
                           color: Colors.orange[50],
                           borderRadius: BorderRadius.circular(10),

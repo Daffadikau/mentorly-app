@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'onboarding_page.dart';
-import 'dashboard_pelajar.dart';
-import 'dashboard_mentor.dart';
-import 'dashboard_admin.dart';
-import 'session_manager.dart';
+import '../pelajar/dashboard_pelajar.dart';
+import '../mentor/dashboard_mentor.dart';
+import '../admin/dashboard_admin.dart';
+import '../utils/session_manager.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -46,18 +46,18 @@ class _SplashScreenState extends State<SplashScreen> {
       } else if (userType == 'admin') {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => DashboardAdmin()),
+          MaterialPageRoute(builder: (context) => const DashboardAdmin()),
         );
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => OnboardingPage()),
+          MaterialPageRoute(builder: (context) => const OnboardingPage()),
         );
       }
     } else {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => OnboardingPage()),
+        MaterialPageRoute(builder: (context) => const OnboardingPage()),
       );
     }
   }

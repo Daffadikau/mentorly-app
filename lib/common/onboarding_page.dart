@@ -144,7 +144,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => WelcomePage(),
+                              builder: (context) => const WelcomePage(),
                             ),
                           );
                         },
@@ -169,7 +169,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => WelcomePage(),
+                            builder: (context) => const WelcomePage(),
                           ),
                         );
                       },

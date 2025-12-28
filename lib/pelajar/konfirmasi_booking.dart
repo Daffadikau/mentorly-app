@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'payment_succes.dart';
+import '../common/payment_succes.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -8,7 +8,8 @@ class KonfirmasiBooking extends StatelessWidget {
   final Map<String, dynamic> pelajarData;
   final Map<String, dynamic> jadwalData;
 
-  const KonfirmasiBooking({super.key, 
+  const KonfirmasiBooking({
+    super.key,
     required this.mentorData,
     required this.pelajarData,
     required this.jadwalData,
@@ -84,8 +85,8 @@ class KonfirmasiBooking extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.blue[700],
         elevation: 0,
-        title:
-            const Text("Konfirmasi Booking", style: TextStyle(color: Colors.white)),
+        title: const Text("Konfirmasi Booking",
+            style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),

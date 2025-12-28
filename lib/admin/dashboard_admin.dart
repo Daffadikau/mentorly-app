@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'welcome_page.dart';
-import 'session_manager.dart';
+import '../common/welcome_page.dart';
+import '../utils/session_manager.dart';
 import 'detail_mentor_admin.dart';
+import '../common/api_config.dart';
 
 class DashboardAdmin extends StatefulWidget {
   const DashboardAdmin({super.key});
@@ -32,7 +33,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
   }
 
   Future<void> loadStats() async {
-    String uri = "http://localhost/mentorly/get_stats.php";
+    String uri = ApiConfig.getUrl("get_stats.php");
     try {
       final respon = await http.get(Uri.parse(uri));
       if (respon.statusCode == 200) {
@@ -51,7 +52,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
       isLoading = true;
     });
 
-    String uri = "http://localhost/mentorly/select_mentor_pending.php";
+    String uri = ApiConfig.getUrl("select_mentor_pending.php");
     try {
       final respon = await http.get(Uri.parse(uri));
       if (respon.statusCode == 200) {
@@ -70,7 +71,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
   }
 
   Future<void> loadMentorVerified() async {
-    String uri = "http://localhost/mentorly/select_mentor.php";
+    String uri = ApiConfig.getUrl("select_mentor.php");
     try {
       final respon = await http.get(Uri.parse(uri));
       if (respon.statusCode == 200) {
@@ -122,14 +123,16 @@ class _DashboardAdminState extends State<DashboardAdmin> {
               PopupMenuItem(
                 child: ListTile(
                   leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text("Keluar", style: TextStyle(color: Colors.red)),
+                  title:
+                      const Text("Keluar", style: TextStyle(color: Colors.red)),
                   contentPadding: EdgeInsets.zero,
                   onTap: () async {
                     Navigator.pop(context);
                     await SessionManager.logout();
                     Navigator.pushAndRemoveUntil(
                       context,
-                      MaterialPageRoute(builder: (context) => WelcomePage()),
+                      MaterialPageRoute(
+                          builder: (context) => const WelcomePage()),
                       (route) => false,
                     );
                   },
@@ -490,7 +493,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
               Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: isPending ? Colors.orange[50] : Colors.green[50],
                       borderRadius: BorderRadius.circular(20),

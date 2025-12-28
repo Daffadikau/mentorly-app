@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'register_pelajar.dart';
 import 'dashboard_pelajar.dart';
-import 'session_manager.dart';
+import '../utils/session_manager.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -63,108 +64,159 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final ref = FirebaseDatabase.instance.ref('pelajar');
-      final normalizedEmail = _email.text.trim().toLowerCase();
+      // Firebase Auth login
+      final userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _email.text.trim().toLowerCase(),
+        password: _password.text,
+      );
 
-      // Try common email field names first
-      final emailKeys = ['email', 'itememail', 'user_email', 'email_address'];
-      MapEntry? matchEntry;
+      final uid = userCredential.user!.uid;
+      final user = userCredential.user!;
 
-      for (var key in emailKeys) {
-        final query = ref.orderByChild(key).equalTo(normalizedEmail);
-        try {
-          final snapshot = await query.get().timeout(const Duration(seconds: 6));
-          if (snapshot.exists) {
-            final raw = snapshot.value;
-            if (raw is Map && raw.isNotEmpty) {
-              matchEntry = raw.entries.first;
-              break;
-            }
-          }
-        } catch (_) {
-          // ignore and try next key
-        }
-      }
-
-      // Fallback: scan all entries and compare any field that looks like email
-      if (matchEntry == null) {
-        try {
-          final allSnap = await ref.get().timeout(const Duration(seconds: 8));
-          if (allSnap.exists && allSnap.value is Map) {
-            final allMap = allSnap.value as Map<dynamic, dynamic>;
-            for (var e in allMap.entries) {
-              final entryVal = e.value;
-              if (entryVal is Map) {
-                for (var f in entryVal.entries) {
-                  final val = f.value;
-                  if (val is String) {
-                    if (val.trim().toLowerCase() == normalizedEmail) {
-                      matchEntry = e;
-                      break;
-                    }
-                  }
-                }
-              }
-              if (matchEntry != null) break;
-            }
-          }
-        } catch (_) {
-          // ignore
-        }
-      }
-
-      if (matchEntry == null) {
-        loginAttempts++;
+      // Check if email is verified
+      if (!user.emailVerified) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Email atau password salah"),
-              backgroundColor: Colors.red,
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text("Verifikasi Diperlukan"),
+              content: const Text(
+                  "Email Anda belum terverifikasi.\n\n1. Cek Inbox/Spam email Anda.\n2. Klik link verifikasi.\n3. Kembali ke sini dan tekan tombol di bawah."),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    // Resend verification email
+                    try {
+                      await user.sendEmailVerification();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text("Email verifikasi dikirim ulang!")),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Gagal mengirim ulang: $e")),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text("Kirim Ulang"),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await FirebaseAuth.instance.signOut();
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: const Text("Batal"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await user.reload();
+                    if (FirebaseAuth.instance.currentUser?.emailVerified ==
+                        true) {
+                      if (context.mounted) Navigator.pop(context);
+                    } else {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                "Belum terverifikasi. Silakan cek email lagi."),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text("Saya Sudah Verifikasi"),
+                ),
+              ],
             ),
           );
-        }
-      } else {
-        final pelajarId = matchEntry.key;
-        final pelajarData = Map<String, dynamic>.from(matchEntry.value as Map);
 
-        final storedPassword = (pelajarData['password'] ?? pelajarData['itempassword'] ?? '').toString();
-        final inputPassword = _password.text;
-
-        if (storedPassword == inputPassword) {
-          loginAttempts = 0;
-          pelajarData['id'] = pelajarId;
-
-          await SessionManager.saveSession(
-            userType: 'pelajar',
-            userData: pelajarData,
-          );
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Login Berhasil!"),
-                backgroundColor: Colors.green,
-              ),
-            );
-
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DashboardPelajar(userData: pelajarData),
-              ),
-            );
-          }
-        } else {
-          loginAttempts++;
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Email atau password salah"),
-                backgroundColor: Colors.red,
-              ),
-            );
+          // Re-check after dialog closes
+          await user.reload();
+          if (FirebaseAuth.instance.currentUser?.emailVerified != true) {
+            await FirebaseAuth.instance.signOut();
+            if (mounted) {
+              setState(() {
+                isLoading = false;
+              });
+            }
+            return;
           }
         }
+      }
+
+      // Fetch user profile from RTDB
+      final ref = FirebaseDatabase.instance.ref('pelajar').child(uid);
+      final snapshot = await ref.get();
+
+      if (!snapshot.exists) {
+        // Create profile if doesn't exist
+        final profileData = {
+          'email': _email.text.trim().toLowerCase(),
+          'uid': uid,
+          'created_at': DateTime.now().toIso8601String(),
+        };
+        await ref.set(profileData);
+      }
+
+      final pelajarData =
+          Map<String, dynamic>.from(snapshot.value as Map? ?? {});
+      pelajarData['id'] = uid;
+      pelajarData['uid'] = uid;
+
+      // Sync email_verified status to RTDB
+      if (pelajarData['email_verified'] != true) {
+        await ref.update({'email_verified': true});
+        pelajarData['email_verified'] = true;
+      }
+
+      loginAttempts = 0;
+
+      await SessionManager.saveSession(
+        userType: 'pelajar',
+        userData: pelajarData,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Login Berhasil!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DashboardPelajar(userData: pelajarData),
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      loginAttempts++;
+      String errorMessage = "Email atau password salah";
+
+      if (e.code == 'user-not-found') {
+        errorMessage = "Akun tidak ditemukan";
+      } else if (e.code == 'wrong-password') {
+        errorMessage = "Password salah";
+      } else if (e.code == 'too-many-requests') {
+        errorMessage = "Terlalu banyak percobaan. Coba lagi nanti.";
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -253,7 +305,9 @@ class _LoginPageState extends State<LoginPage> {
                   prefixIcon: const Icon(Icons.lock_outlined),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                     ),
                     onPressed: () {
                       setState(() {
@@ -331,7 +385,8 @@ class _LoginPageState extends State<LoginPage> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const RegisterPage()),
+                        MaterialPageRoute(
+                            builder: (context) => const RegisterPage()),
                       );
                     },
                     child: Text(

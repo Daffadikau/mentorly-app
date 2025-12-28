@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'login_pelajar.dart';
 import 'dashboard_pelajar.dart';
-import 'session_manager.dart';
+import '../utils/session_manager.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -59,42 +60,80 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!validasi()) return;
 
     try {
-      final ref = FirebaseDatabase.instance.ref('pelajar');
-      final newRef = ref.push();
+      // Create Firebase Auth account
+      final userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _email.text.trim().toLowerCase(),
+        password: _password.text,
+      );
+
+      final uid = userCredential.user!.uid;
+      final user = userCredential.user!;
+
+      // 1. Send Email Verification
+      await user.sendEmailVerification();
+
+      // Save user profile to RTDB
+      final ref = FirebaseDatabase.instance.ref('pelajar').child(uid);
 
       final normalizedEmail = _email.text.trim().toLowerCase();
-      final user = {
+      final profileData = {
         'email': normalizedEmail,
-        'password': _password.text,
         'phone': _phone.text.trim(),
         'created_at': DateTime.now().toIso8601String(),
+        'uid': uid,
+        'email_verified': false,
       };
 
-      await newRef.set(user);
+      await ref.set(profileData);
 
-      final userData = {
-        'id': newRef.key,
-        ...user,
-      };
+      // 2. Sign out immediately so they can't access dashboard yet
+      await FirebaseAuth.instance.signOut();
 
-      await SessionManager.saveSession(
-        userType: 'pelajar',
-        userData: userData,
-      );
+      if (mounted) {
+        // 3. Show Verification Dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text("Verifikasi Email"),
+            content: Text(
+                "Link verifikasi telah dikirim ke ${_email.text}. Silakan cek email Anda untuk mengaktifkan akun sebelum login."),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                  );
+                },
+                child: const Text("Ke Halaman Login"),
+              ),
+            ],
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = 'Gagal registrasi';
+      if (e.code == 'weak-password') {
+        errorMessage = 'Password terlalu lemah';
+      } else if (e.code == 'email-already-in-use') {
+        errorMessage = 'Email sudah terdaftar';
+      } else if (e.code == 'configuration-not-found' ||
+          e.code == 'operation-not-allowed') {
+        errorMessage =
+            'Login Email/Password belum diaktifkan di Firebase Console';
+      } else {
+        errorMessage = 'Gagal (${e.code}): ${e.message}';
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Registrasi Berhasil!")),
-      );
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DashboardPelajar(userData: userData),
-        ),
+        SnackBar(content: Text(errorMessage)),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal registrasi: $e')),
+        SnackBar(content: Text('Terjadi kesalahan: $e')),
       );
     }
   }
@@ -195,7 +234,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                        MaterialPageRoute(
+                            builder: (context) => const LoginPage()),
                       );
                     },
                     child: Text(

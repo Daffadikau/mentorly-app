@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'welcome_page.dart';
-import 'session_manager.dart';
+import '../common/welcome_page.dart';
+import '../utils/session_manager.dart';
 import 'profile_mentor.dart';
 
 class DashboardMentor extends StatefulWidget {
@@ -65,7 +65,8 @@ class _DashboardMentorState extends State<DashboardMentor> {
       var data = jsonDecode(response.body);
       if (data['status'] == 'success') {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Dana berhasil ditarik dan sedang diproses")),
+          const SnackBar(
+              content: Text("Dana berhasil ditarik dan sedang diproses")),
         );
 
         setState(() {
@@ -154,7 +155,7 @@ class _DashboardMentorState extends State<DashboardMentor> {
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => WelcomePage(),
+                                builder: (context) => const WelcomePage(),
                               ),
                               (route) => false,
                             );
@@ -229,7 +230,8 @@ class _DashboardMentorState extends State<DashboardMentor> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Dana di Proses", style: TextStyle(fontSize: 16)),
+                        const Text("Dana di Proses",
+                            style: TextStyle(fontSize: 16)),
                         const SizedBox(height: 5),
                         Text(
                           "Rp. ${_formatCurrency(currentMentorData['dana_proses'])}",

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'login_pelajar.dart';
-import 'login_mentor.dart';
-import 'login_admin.dart';
+import '../pelajar/login_pelajar.dart';
+import '../mentor/login_mentor.dart';
+import '../admin/login_admin.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
@@ -52,7 +52,7 @@ class WelcomePage extends StatelessWidget {
                   Icons.person,
                   () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => LoginPage()),
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -62,7 +62,8 @@ class WelcomePage extends StatelessWidget {
                   Icons.school,
                   () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => LoginMentor()),
+                    MaterialPageRoute(
+                        builder: (context) => const LoginMentor()),
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -72,7 +73,7 @@ class WelcomePage extends StatelessWidget {
                   Icons.admin_panel_settings,
                   () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => LoginAdmin()),
+                    MaterialPageRoute(builder: (context) => const LoginAdmin()),
                   ),
                 ),
               ],

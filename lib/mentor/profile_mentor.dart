@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'welcome_page.dart';
-import 'session_manager.dart';
+import '../common/welcome_page.dart';
+import '../utils/session_manager.dart';
 
 class ProfileMentor extends StatefulWidget {
   final Map<String, dynamic> mentorData;
@@ -176,7 +176,8 @@ class _ProfileMentorState extends State<ProfileMentor> {
       appBar: AppBar(
         backgroundColor: Colors.blue[700],
         elevation: 0,
-        title: const Text("Profil Pengajar", style: TextStyle(color: Colors.white)),
+        title: const Text("Profil Pengajar",
+            style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -550,7 +551,7 @@ class _ProfileMentorState extends State<ProfileMentor> {
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) => WelcomePage()),
+                                  builder: (context) => const WelcomePage()),
                               (route) => false,
                             );
                           }

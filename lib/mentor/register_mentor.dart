@@ -1,7 +1,12 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
-import 'verifikasi_pending.dart';
+import '../common/verifikasi_pending.dart';
+import 'login_mentor.dart';
 
 class RegisterMentor extends StatefulWidget {
   const RegisterMentor({super.key});
@@ -31,6 +36,12 @@ class _RegisterMentorState extends State<RegisterMentor> {
   String? _selectedKTP;
   String? _selectedSKCK;
   String? _selectedSertifikat;
+
+  // Store actual file paths/bytes
+  PlatformFile? _filePendidikan;
+  PlatformFile? _fileKTP;
+  PlatformFile? _fileSKCK;
+  PlatformFile? _fileSertifikat;
 
   @override
   void dispose() {
@@ -103,6 +114,29 @@ class _RegisterMentorState extends State<RegisterMentor> {
     return true;
   }
 
+  Future<String?> _uploadFileToStorage(
+      PlatformFile? file, String folder, String uid) async {
+    if (file == null) return null;
+    // On mobile path is required, on web bytes are required
+    if (!kIsWeb && file.path == null) return null;
+    if (kIsWeb && file.bytes == null) return null;
+
+    try {
+      final ref =
+          FirebaseStorage.instance.ref().child('$folder/$uid/${file.name}');
+
+      // Use putData for Web (bytes), putFile for Mobile (path)
+      final uploadTask =
+          kIsWeb ? ref.putData(file.bytes!) : ref.putFile(File(file.path!));
+
+      final snapshot = await uploadTask;
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      print("Error uploading $folder: $e");
+      return null;
+    }
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -120,39 +154,95 @@ class _RegisterMentorState extends State<RegisterMentor> {
     });
 
     try {
-      final ref = FirebaseDatabase.instance.ref('mentor');
-      final newRef = ref.push();
+      // Create Firebase Auth account
+      final userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _email.text.trim().toLowerCase(),
+        password: _password.text,
+      );
+
+      final uid = userCredential.user!.uid;
+      final user = userCredential.user!;
+
+      // 1. Send Email Verification
+      await user.sendEmailVerification();
+
+      // Upload files first
+      String? urlPendidikan =
+          await _uploadFileToStorage(_filePendidikan, 'pendidikan', uid);
+      String? urlKTP = await _uploadFileToStorage(_fileKTP, 'ktp', uid);
+      String? urlSKCK = await _uploadFileToStorage(_fileSKCK, 'skck', uid);
+      String? urlSertifikat =
+          await _uploadFileToStorage(_fileSertifikat, 'sertifikat', uid);
+
+      // Save mentor profile to RTDB
+      final ref = FirebaseDatabase.instance.ref('mentor').child(uid);
 
       final mentor = {
+        'uid': uid,
         'nama_lengkap': _namaLengkap.text.trim(),
-        'email': _email.text.trim(),
-        'password': _password.text,
+        'email': _email.text.trim().toLowerCase(),
         'nik': _nik.text.trim(),
         'keahlian': selectedKeahlian,
         'kelamin': selectedKelamin,
         'keahlian_lain': _keahlianLain.text.trim(),
         'linkedin': _linkedin.text.trim(),
+        'url_pendidikan': urlPendidikan,
+        'url_ktp': urlKTP,
+        'url_skck': urlSKCK,
+        'url_sertifikat': urlSertifikat,
         'status_verifikasi': 'pending',
         'created_at': DateTime.now().toIso8601String(),
       };
 
-      await newRef.set(mentor);
+      await ref.set(mentor);
+
+      // 2. Sign out immediately
+      await FirebaseAuth.instance.signOut();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Registrasi berhasil. Menunggu verifikasi..."),
-            backgroundColor: Colors.green,
+        // 3. Show Verification Dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text("Verifikasi Email"),
+            content: Text(
+                "Link verifikasi telah dikirim ke ${_email.text}. Silakan cek email Anda untuk mengaktifkan akun."),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const LoginMentor()),
+                  );
+                },
+                child: const Text("Ke Halaman Login"),
+              ),
+            ],
           ),
         );
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => VerifikasiPending()),
-        );
       }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = 'Registrasi gagal';
+      if (e.code == 'weak-password') {
+        errorMessage = 'Password terlalu lemah';
+      } else if (e.code == 'email-already-in-use') {
+        errorMessage = 'Email sudah terdaftar';
+      } else if (e.code == 'configuration-not-found' ||
+          e.code == 'operation-not-allowed') {
+        errorMessage =
+            'Login Email/Password belum diaktifkan di Firebase Console';
+      } else {
+        // Show specific error code for debugging
+        errorMessage = 'Gagal (${e.code}): ${e.message}';
+      }
+      _showError(errorMessage);
     } catch (e) {
-      _showError("Registrasi gagal: $e");
+      _showError("Terjadi kesalahan: $e");
+      print("DEBUG ERROR: $e"); // Print to console for details
     } finally {
       if (mounted) {
         setState(() {
@@ -248,11 +338,13 @@ class _RegisterMentorState extends State<RegisterMentor> {
               TextInputType.url,
             ),
             const SizedBox(height: 15),
-            _buildFileUpload("Hasil Pendidikan Terakhir (Pdf, file)", "pendidikan"),
+            _buildFileUpload(
+                "Hasil Pendidikan Terakhir (Pdf, file)", "pendidikan"),
             const SizedBox(height: 15),
             _buildFileUpload("KTP (Pdf, file)", "ktp"),
             const SizedBox(height: 15),
-            _buildFileUpload("SKCK (Scan Keterangan Catatan Kepolisian)", "skck"),
+            _buildFileUpload(
+                "SKCK (Scan Keterangan Catatan Kepolisian)", "skck"),
             const SizedBox(height: 15),
             _buildFileUpload("Sertifikat (*opsional)", "sertifikat"),
             const SizedBox(height: 30),
@@ -368,7 +460,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
 
   Widget _buildFileUpload(String label, String fileType) {
     String? selectedFile;
-    
+
     // Get the selected file for this type
     switch (fileType) {
       case "pendidikan":
@@ -402,15 +494,19 @@ class _RegisterMentorState extends State<RegisterMentor> {
                 switch (fileType) {
                   case "pendidikan":
                     _selectedPendidikan = result.files.single.name;
+                    _filePendidikan = result.files.single;
                     break;
                   case "ktp":
                     _selectedKTP = result.files.single.name;
+                    _fileKTP = result.files.single;
                     break;
                   case "skck":
                     _selectedSKCK = result.files.single.name;
+                    _fileSKCK = result.files.single;
                     break;
                   case "sertifikat":
                     _selectedSertifikat = result.files.single.name;
+                    _fileSertifikat = result.files.single;
                     break;
                 }
               });
