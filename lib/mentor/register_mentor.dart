@@ -5,7 +5,6 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
-import '../common/verifikasi_pending.dart';
 import 'login_mentor.dart';
 
 class RegisterMentor extends StatefulWidget {

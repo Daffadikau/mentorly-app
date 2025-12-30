@@ -43,3 +43,39 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+# .gitignore additions for security
+
+# Environment variables (NEVER commit these!)
+.env
+.env.local
+.env.production
+.env.staging
+
+# Security logs
+logs/
+*.log
+security.log
+
+# Backup files
+backups/
+*.backup
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+
+# Database dumps
+*.sql
+*.db
+
+# Sensitive config
+config/secrets.php
+config/database.php
+secrets/
+
+# IDE specific
+.vscode/settings.json
+.idea/workspace.xml

@@ -37,6 +37,16 @@ dependencies:
   shared_preferences: ^2.2.2
   # Crypto untuk enkripsi
   crypto: ^3.0.3
+  # Secure storage for sensitive data
+  flutter_secure_storage: ^9.0.0
+  # Certificate pinning
+  dio: ^5.4.0
+  # Rate limiting and throttling
+  throttling: ^2.0.0
+  # Device info for security checks
+  device_info_plus: ^10.0.0
+  # Package info for version checks
+  package_info_plus: ^9.0.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

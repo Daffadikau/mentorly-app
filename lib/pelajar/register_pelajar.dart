@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_pelajar.dart';
-import 'dashboard_pelajar.dart';
-import '../utils/session_manager.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
