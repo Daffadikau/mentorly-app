@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'dart:async';
+
+import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 class DetailChatPage extends StatefulWidget {
   final Map<String, dynamic> mentorData;
@@ -14,17 +16,21 @@ class DetailChatPage extends StatefulWidget {
 }
 
 class _DetailChatPageState extends State<DetailChatPage> {
-  List messageList = [];
+  List<Map<String, dynamic>> messageList = const [];
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  Timer? _timer;
+  StreamSubscription<DatabaseEvent>? _messagesSub;
   bool isLoading = true;
   bool isSending = false;
   String? errorMessage;
 
+  bool _stickToBottom = true;
+  int? _lastMessagesRevision;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_handleScroll);
     _initializeChat();
   }
 
@@ -40,14 +46,34 @@ class _DetailChatPageState extends State<DetailChatPage> {
     }
 
     loadMessages();
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      loadMessages(silent: true);
-    });
+
+    final ref = FirebaseDatabase.instance.ref('pesan');
+    final query = ref
+        .orderByChild('pelajar_id')
+        .equalTo(widget.pelajarData['id'].toString());
+
+    _messagesSub?.cancel();
+    _messagesSub = query.onValue.listen(
+      (event) {
+        _applySnapshot(event.snapshot, silent: true);
+      },
+      onError: (e) {
+        debugPrint("Error listening messages: $e");
+      },
+    );
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final distanceToBottom = position.maxScrollExtent - position.pixels;
+    _stickToBottom = distanceToBottom < 120;
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _messagesSub?.cancel();
+    _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     _messageController.dispose();
     super.dispose();
@@ -69,49 +95,9 @@ class _DetailChatPageState extends State<DetailChatPage> {
 
       final snapshot = await query.get().timeout(const Duration(seconds: 10));
 
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>;
-        final messages = <Map<String, dynamic>>[];
-
-        data.forEach((key, value) {
-          final msg = Map<String, dynamic>.from(value as Map);
-          // Filter by mentor_id if needed
-          if (msg['mentor_id'].toString() ==
-              widget.mentorData['mentor_id'].toString()) {
-            messages.add(msg);
-          }
-        });
-
-        // Sort by timestamp
-        messages.sort((a, b) {
-          final timeA =
-              DateTime.tryParse(a['timestamp'] ?? '') ?? DateTime.now();
-          final timeB =
-              DateTime.tryParse(b['timestamp'] ?? '') ?? DateTime.now();
-          return timeA.compareTo(timeB);
-        });
-
-        if (mounted) {
-          setState(() {
-            messageList = messages;
-            if (!silent) {
-              isLoading = false;
-            }
-          });
-          _scrollToBottom();
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            messageList = [];
-            if (!silent) {
-              isLoading = false;
-            }
-          });
-        }
-      }
+      _applySnapshot(snapshot, silent: silent);
     } catch (e) {
-      print("Error loading messages: $e");
+      debugPrint("Error loading messages: $e");
       if (!silent && mounted) {
         setState(() {
           errorMessage = "Gagal memuat pesan";
@@ -121,18 +107,123 @@ class _DetailChatPageState extends State<DetailChatPage> {
     }
   }
 
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
+  void _applySnapshot(DataSnapshot snapshot, {required bool silent}) {
+    if (!snapshot.exists) {
+      if (!mounted) return;
+      setState(() {
+        messageList = const [];
+        if (!silent) isLoading = false;
       });
+      return;
     }
+
+    final raw = snapshot.value;
+    if (raw is! Map) {
+      if (!mounted) return;
+      setState(() {
+        messageList = const [];
+        if (!silent) isLoading = false;
+      });
+      return;
+    }
+
+    final pelajarId = widget.pelajarData['id'].toString();
+    final mentorId = widget.mentorData['mentor_id'].toString();
+    final normalized =
+        _normalizeMessages(raw, pelajarId: pelajarId, mentorId: mentorId);
+
+    final lastTs =
+        normalized.isEmpty ? 0 : (normalized.last['_ts'] as int? ?? 0);
+    final lastKey = normalized.isEmpty
+        ? ''
+        : (normalized.last['_key']?.toString() ?? '');
+    final revision = Object.hash(normalized.length, lastTs, lastKey);
+    if (revision == _lastMessagesRevision) {
+      if (!silent && mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+      return;
+    }
+    _lastMessagesRevision = revision;
+
+    if (!mounted) return;
+    setState(() {
+      messageList = normalized;
+      if (!silent) isLoading = false;
+    });
+
+    if (_stickToBottom) {
+      _scrollToBottom(animated: silent);
+    }
+  }
+
+  static List<Map<String, dynamic>> _normalizeMessages(
+    Map raw, {
+    required String pelajarId,
+    required String mentorId,
+  }) {
+    final messages = <Map<String, dynamic>>[];
+
+    raw.forEach((key, value) {
+      if (value is! Map) return;
+      final msg = Map<String, dynamic>.from(value);
+
+      if ((msg['pelajar_id']?.toString() ?? '') != pelajarId) return;
+      if ((msg['mentor_id']?.toString() ?? '') != mentorId) return;
+
+      final tsString = (msg['created_at'] ?? msg['timestamp'])?.toString();
+      final ts = _parseIsoToMillis(tsString);
+      msg['_ts'] = ts;
+      msg['_dayKey'] = _dayKeyFromMillis(ts);
+      msg['_key'] = key.toString();
+
+      final sender = (msg['sender_type'] ?? msg['sender'])?.toString();
+      msg['_isMe'] = sender == 'pelajar';
+
+      messages.add(msg);
+    });
+
+    messages.sort((a, b) {
+      final ta = a['_ts'] as int? ?? 0;
+      final tb = b['_ts'] as int? ?? 0;
+      return ta.compareTo(tb);
+    });
+
+    return messages.toList(growable: false);
+  }
+
+  static int _parseIsoToMillis(String? timestamp) {
+    if (timestamp == null || timestamp.isEmpty) return 0;
+    final dt = DateTime.tryParse(timestamp);
+    return dt?.millisecondsSinceEpoch ?? 0;
+  }
+
+  static String _dayKeyFromMillis(int millis) {
+    if (millis <= 0) return '';
+    final dt = DateTime.fromMillisecondsSinceEpoch(millis);
+    final y = dt.year.toString().padLeft(4, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    return "$y-$m-$d";
+  }
+
+  void _scrollToBottom({bool animated = true}) {
+    if (!_scrollController.hasClients) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final target = _scrollController.position.maxScrollExtent;
+      if (animated) {
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(target);
+      }
+    });
   }
 
   Future<void> sendMessage() async {
@@ -172,9 +263,10 @@ class _DetailChatPageState extends State<DetailChatPage> {
       };
 
       await newRef.set(pesan).timeout(const Duration(seconds: 10));
+      _stickToBottom = true;
       await loadMessages(silent: true);
     } catch (e) {
-      print("Error sending message: $e");
+      debugPrint("Error sending message: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
