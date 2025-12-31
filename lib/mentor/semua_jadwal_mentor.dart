@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'tambah_jadwal_mentor.dart';
 
+import '../common/api_config.dart';
+
 class SemuaJadwalMentor extends StatefulWidget {
   final Map<String, dynamic> mentorData;
 
@@ -29,7 +31,7 @@ class _SemuaJadwalMentorState extends State<SemuaJadwalMentor> {
       errorMessage = null;
     });
 
-    String uri = "http://localhost/mentorly/get_jadwal_mentor.php";
+    String uri = ApiConfig.getUrl('get_jadwal_mentor.php');
 
     try {
       var response = await http.post(
@@ -82,7 +84,7 @@ class _SemuaJadwalMentorState extends State<SemuaJadwalMentor> {
 
     if (confirm != true) return;
 
-    String uri = "http://localhost/mentorly/delete_jadwal_mentor.php";
+    String uri = ApiConfig.getUrl('delete_jadwal_mentor.php');
 
     try {
       var response = await http.post(

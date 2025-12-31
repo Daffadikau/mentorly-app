@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class DetailChatPage extends StatefulWidget {
@@ -448,22 +447,22 @@ class _DetailChatPageState extends State<DetailChatPage> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       itemCount: messageList.length,
       itemBuilder: (context, index) {
-        var message = messageList[index];
-        bool isMe = message['sender_type'] == 'pelajar';
+        final message = messageList[index];
+        final isMe = (message['_isMe'] as bool?) ?? false;
 
-        bool showDate = false;
-        if (index == 0) {
-          showDate = true;
-        } else {
-          String currentDate = _formatDateOnly(message['created_at']);
-          String previousDate =
-              _formatDateOnly(messageList[index - 1]['created_at']);
-          showDate = currentDate != previousDate;
-        }
+        final currentDayKey = message['_dayKey']?.toString() ?? '';
+        final previousDayKey = index > 0
+            ? (messageList[index - 1]['_dayKey']?.toString() ?? '')
+            : '';
+
+        final showDate = currentDayKey.isNotEmpty &&
+            (index == 0 || currentDayKey != previousDayKey);
+
+        final ts = (message['_ts'] as int?) ?? 0;
 
         return Column(
           children: [
-            if (showDate) _buildDateHeader(message['created_at']),
+            if (showDate) _buildDateHeader(ts),
             _buildMessageBubble(message, isMe),
           ],
         );
@@ -471,7 +470,8 @@ class _DetailChatPageState extends State<DetailChatPage> {
     );
   }
 
-  Widget _buildDateHeader(String timestamp) {
+  Widget _buildDateHeader(int millis) {
+    if (millis <= 0) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Container(
@@ -487,7 +487,7 @@ class _DetailChatPageState extends State<DetailChatPage> {
           ],
         ),
         child: Text(
-          _formatDateOnly(timestamp),
+          _formatDateLabelFromMillis(millis),
           style: TextStyle(
             fontSize: 11,
             color: Colors.grey[700],
@@ -531,7 +531,7 @@ class _DetailChatPageState extends State<DetailChatPage> {
               isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             Text(
-              message['message'] ?? '',
+              message['message']?.toString() ?? '',
               style: const TextStyle(
                 color: Colors.black87,
                 fontSize: 15,
@@ -543,7 +543,7 @@ class _DetailChatPageState extends State<DetailChatPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _formatTime(message['created_at']),
+                  _formatTimeFromMillis((message['_ts'] as int?) ?? 0),
                   style: TextStyle(color: Colors.grey[600], fontSize: 11),
                 ),
                 if (isMe) ...[
@@ -626,51 +626,46 @@ class _DetailChatPageState extends State<DetailChatPage> {
     );
   }
 
-  String _formatTime(String? timestamp) {
-    if (timestamp == null) return "";
-    try {
-      DateTime dateTime = DateTime.parse(timestamp);
-      return "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}";
-    } catch (e) {
-      return "";
-    }
+  String _formatTimeFromMillis(int millis) {
+    if (millis <= 0) return "";
+    final dt = DateTime.fromMillisecondsSinceEpoch(millis);
+    return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
   }
 
-  String _formatDateOnly(String? timestamp) {
-    if (timestamp == null) return "";
-    try {
-      DateTime dateTime = DateTime.parse(timestamp);
-      DateTime now = DateTime.now();
-      DateTime yesterday = now.subtract(const Duration(days: 1));
+  String _formatDateLabelFromMillis(int millis) {
+    if (millis <= 0) return "";
+    final dateTime = DateTime.fromMillisecondsSinceEpoch(millis);
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
 
-      if (dateTime.year == now.year &&
-          dateTime.month == now.month &&
-          dateTime.day == now.day) {
-        return "Hari Ini";
-      } else if (dateTime.year == yesterday.year &&
-          dateTime.month == yesterday.month &&
-          dateTime.day == yesterday.day) {
-        return "Kemarin";
-      } else {
-        List<String> months = [
-          '',
-          'Januari',
-          'Februari',
-          'Maret',
-          'April',
-          'Mei',
-          'Juni',
-          'Juli',
-          'Agustus',
-          'September',
-          'Oktober',
-          'November',
-          'Desember',
-        ];
-        return "${dateTime.day} ${months[dateTime.month]} ${dateTime.year}";
-      }
-    } catch (e) {
-      return "";
-    }
+    final isToday = dateTime.year == now.year &&
+        dateTime.month == now.month &&
+        dateTime.day == now.day;
+    if (isToday) return "Hari Ini";
+
+    final isYesterday = dateTime.year == yesterday.year &&
+        dateTime.month == yesterday.month &&
+        dateTime.day == yesterday.day;
+    if (isYesterday) return "Kemarin";
+
+    const months = [
+      '',
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+
+    final monthName =
+        (dateTime.month >= 1 && dateTime.month <= 12) ? months[dateTime.month] : '';
+    return "${dateTime.day} $monthName ${dateTime.year}";
   }
 }

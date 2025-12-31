@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_database/firebase_database.dart';
 import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
 import 'detail_mentor_admin.dart';
@@ -52,22 +53,74 @@ class _DashboardAdminState extends State<DashboardAdmin> {
       isLoading = true;
     });
 
-    String uri = ApiConfig.getUrl("select_mentor_pending.php");
+    print("🔍 Loading pending mentors from Firebase...");
+    List allPending = [];
+
     try {
+      // 1. Check Firebase RTDB for pending mentors
+      final snapshot = await FirebaseDatabase.instance.ref('mentors').get();
+      
+      if (snapshot.exists) {
+        final data = snapshot.value;
+        print("📊 Firebase data type: ${data.runtimeType}");
+        
+        if (data is List) {
+          // Data stored as List
+          for (int i = 0; i < data.length; i++) {
+            final mentor = data[i];
+            if (mentor != null && mentor is Map) {
+              if (mentor['status_verifikasi'] == 'pending') {
+                final mentorData = Map<String, dynamic>.from(mentor);
+                mentorData['firebase_index'] = i;
+                mentorData['source'] = 'firebase';
+                allPending.add(mentorData);
+                print("✅ Found pending: ${mentorData['nama_lengkap']}");
+              }
+            }
+          }
+        } else if (data is Map) {
+          // Data stored as Map
+          data.forEach((key, value) {
+            if (value != null && value is Map) {
+              if (value['status_verifikasi'] == 'pending') {
+                final mentorData = Map<String, dynamic>.from(value);
+                mentorData['uid'] = key;
+                mentorData['source'] = 'firebase';
+                allPending.add(mentorData);
+                print("✅ Found pending: ${mentorData['nama_lengkap']}");
+              }
+            }
+          });
+        }
+      }
+      print("📊 Firebase pending count: ${allPending.length}");
+    } catch (e) {
+      print("❌ Error loading from Firebase: $e");
+    }
+
+    // 2. Also check PHP backend
+    try {
+      String uri = ApiConfig.getUrl("select_mentor_pending.php");
       final respon = await http.get(Uri.parse(uri));
       if (respon.statusCode == 200) {
-        final data = jsonDecode(respon.body);
-        setState(() {
-          mentorPending = data;
-          isLoading = false;
-        });
+        final phpData = jsonDecode(respon.body);
+        if (phpData is List) {
+          for (var mentor in phpData) {
+            mentor['source'] = 'php';
+          }
+          allPending.addAll(phpData);
+        }
+        print("📊 PHP pending count: ${phpData.length}");
       }
     } catch (e) {
-      print(e);
-      setState(() {
-        isLoading = false;
-      });
+      print("❌ Error loading from PHP: $e");
     }
+
+    setState(() {
+      mentorPending = allPending;
+      isLoading = false;
+    });
+    print("✅ Total pending mentors: ${allPending.length}");
   }
 
   Future<void> loadMentorVerified() async {

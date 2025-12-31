@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+import '../common/api_config.dart';
 import 'dart:convert';
 
 class DetailMentorAdmin extends StatelessWidget {
@@ -8,7 +10,7 @@ class DetailMentorAdmin extends StatelessWidget {
   const DetailMentorAdmin({super.key, required this.mentorData});
 
   Future<void> verifyMentor(BuildContext context, String status) async {
-    String uri = "http://localhost/mentorly/verify_mentor.php";
+    final uri = ApiConfig.getUrl('verify_mentor.php');
 
     var response = await http.post(
       Uri.parse(uri),
@@ -164,15 +166,34 @@ class DetailMentorAdmin extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 15),
-                  _buildDocumentCard("KTP", Icons.credit_card, Colors.green),
                   _buildDocumentCard(
-                      "Ijazah Terakhir", Icons.description, Colors.blue),
+                    context,
+                    "KTP", 
+                    Icons.credit_card, 
+                    Colors.green,
+                    mentorData['ktp'] as String?,
+                  ),
                   _buildDocumentCard(
-                      "SKCK", Icons.verified_user, Colors.purple),
-                  if (mentorData['sertifikat'] != null &&
-                      mentorData['sertifikat'].toString().isNotEmpty)
-                    _buildDocumentCard(
-                        "Sertifikat", Icons.card_membership, Colors.amber),
+                    context,
+                    "Ijazah Terakhir", 
+                    Icons.description, 
+                    Colors.blue,
+                    mentorData['pendidikan'] as String?,
+                  ),
+                  _buildDocumentCard(
+                    context,
+                    "SKCK", 
+                    Icons.verified_user, 
+                    Colors.purple,
+                    mentorData['skck'] as String?,
+                  ),
+                  _buildDocumentCard(
+                    context,
+                    "Sertifikat", 
+                    Icons.card_membership, 
+                    Colors.amber,
+                    mentorData['sertifikat'] as String?,
+                  ),
                   const SizedBox(height: 25),
                   Text(
                     "Informasi Tambahan",
@@ -434,7 +455,9 @@ class DetailMentorAdmin extends StatelessWidget {
     );
   }
 
-  Widget _buildDocumentCard(String title, IconData icon, MaterialColor color) {
+  Widget _buildDocumentCard(BuildContext context, String title, IconData icon, MaterialColor color, String? fileUrl) {
+    bool hasFile = fileUrl != null && fileUrl.isNotEmpty;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
@@ -463,28 +486,64 @@ class DetailMentorAdmin extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.green[50],
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                const SizedBox(width: 5),
-                Text(
-                  "Uploaded",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.green[700],
-                    fontWeight: FontWeight.bold,
-                  ),
+          if (hasFile)
+            InkWell(
+              onTap: () async {
+                final uri = Uri.parse(fileUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Tidak dapat membuka file")),
+                  );
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.download, color: Colors.blue[700], size: 16),
+                    const SizedBox(width: 5),
+                    Text(
+                      "Lihat PDF",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.close, color: Colors.grey[600], size: 16),
+                  const SizedBox(width: 5),
+                  Text(
+                    "Tidak Ada",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );

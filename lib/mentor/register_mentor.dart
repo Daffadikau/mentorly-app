@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -109,30 +110,86 @@ class _RegisterMentorState extends State<RegisterMentor> {
       _showError("NIK hanya boleh berisi angka");
       return false;
     }
+    // VALIDATE FILES ARE REQUIRED
+    if (_filePendidikan == null) {
+      _showError("❌ File Ijazah Pendidikan WAJIB diupload!");
+      return false;
+    }
 
+    if (_fileKTP == null) {
+      _showError("❌ File KTP WAJIB diupload!");
+      return false;
+    }
+
+    if (_fileSKCK == null) {
+      _showError("❌ File SKCK WAJIB diupload!");
+      return false;
+    }
+
+    if (_fileSertifikat == null) {
+      _showError("❌ File Sertifikat WAJIB diupload!");
+      return false;
+    }
     return true;
   }
 
   Future<String?> _uploadFileToStorage(
       PlatformFile? file, String folder, String uid) async {
-    if (file == null) return null;
+    if (file == null) {
+      print("⚠️ No file selected for $folder");
+      return null;
+    }
+    
     // On mobile path is required, on web bytes are required
-    if (!kIsWeb && file.path == null) return null;
-    if (kIsWeb && file.bytes == null) return null;
+    if (!kIsWeb && file.path == null) {
+      print("❌ Mobile: No file path for $folder");
+      return null;
+    }
+    if (kIsWeb && file.bytes == null) {
+      print("❌ Web: No file bytes for $folder");
+      return null;
+    }
 
     try {
+      print("📤 Starting upload for $folder/${file.name}");
+      print("📦 File size: ${file.size} bytes");
+      
       final ref =
           FirebaseStorage.instance.ref().child('$folder/$uid/${file.name}');
+      print("📍 Storage ref: $folder/$uid/${file.name}");
 
       // Use putData for Web (bytes), putFile for Mobile (path)
+      print("🚀 Starting upload task...");
       final uploadTask =
           kIsWeb ? ref.putData(file.bytes!) : ref.putFile(File(file.path!));
 
-      final snapshot = await uploadTask;
-      return await snapshot.ref.getDownloadURL();
-    } catch (e) {
-      print("Error uploading $folder: $e");
-      return null;
+      // Listen to upload progress
+      uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+        final progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        print("📊 Progress $folder: ${progress.toStringAsFixed(1)}%");
+      });
+
+      print("⏳ Awaiting upload completion...");
+      final snapshot = await uploadTask.whenComplete(() => null);
+      
+      print("🔗 Getting download URL...");
+      final downloadURL = await snapshot.ref.getDownloadURL();
+      print("✅ $folder uploaded: $downloadURL");
+      return downloadURL;
+    } catch (e, stackTrace) {
+      print("❌ Error uploading $folder: $e");
+      print("📜 Stack: $stackTrace");
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("❌ Upload $folder gagal: ${e.toString()}"),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+      rethrow; // Must succeed - throw error
     }
   }
 
@@ -153,7 +210,10 @@ class _RegisterMentorState extends State<RegisterMentor> {
     });
 
     try {
+      print("🔄 Starting registration...");
+      
       // Create Firebase Auth account
+      print("🔄 Creating Firebase Auth account...");
       final userCredential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _email.text.trim().toLowerCase(),
@@ -162,20 +222,32 @@ class _RegisterMentorState extends State<RegisterMentor> {
 
       final uid = userCredential.user!.uid;
       final user = userCredential.user!;
+      print("✅ Firebase Auth account created: $uid");
 
       // 1. Send Email Verification
+      print("📧 Sending verification email...");
       await user.sendEmailVerification();
+      print("✅ Verification email sent");
 
       // Upload files first
+      print("📤 Uploading files...");
       String? urlPendidikan =
           await _uploadFileToStorage(_filePendidikan, 'pendidikan', uid);
+      print("✅ Pendidikan uploaded: ${urlPendidikan != null}");
+      
       String? urlKTP = await _uploadFileToStorage(_fileKTP, 'ktp', uid);
+      print("✅ KTP uploaded: ${urlKTP != null}");
+      
       String? urlSKCK = await _uploadFileToStorage(_fileSKCK, 'skck', uid);
+      print("✅ SKCK uploaded: ${urlSKCK != null}");
+      
       String? urlSertifikat =
           await _uploadFileToStorage(_fileSertifikat, 'sertifikat', uid);
+      print("✅ Sertifikat uploaded: ${urlSertifikat != null}");
 
-      // Save mentor profile to RTDB
-      final ref = FirebaseDatabase.instance.ref('mentor').child(uid);
+      // Save mentor profile to RTDB (use 'mentors' plural to match login)
+      print("💾 Saving to Firebase RTDB...");
+      final ref = FirebaseDatabase.instance.ref('mentors').child(uid);
 
       final mentor = {
         'uid': uid,
@@ -195,9 +267,11 @@ class _RegisterMentorState extends State<RegisterMentor> {
       };
 
       await ref.set(mentor);
+      print("✅ Data saved to Firebase RTDB");
 
       // 2. Sign out immediately
       await FirebaseAuth.instance.signOut();
+      print("✅ Signed out successfully");
 
       if (mounted) {
         // 3. Show Verification Dialog
@@ -485,7 +559,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
           onTap: () async {
             FilePickerResult? result = await FilePicker.platform.pickFiles(
               type: FileType.custom,
-              allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+              allowedExtensions: ['pdf'],
             );
 
             if (result != null) {

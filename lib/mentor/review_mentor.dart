@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import '../common/api_config.dart';
+
 class ReviewPage extends StatefulWidget {
   final Map<String, dynamic> bookingData;
 
@@ -28,7 +30,7 @@ class _ReviewPageState extends State<ReviewPage> {
       isSubmitting = true;
     });
 
-    String uri = "http://localhost/mentorly/submit_review.php";
+    String uri = ApiConfig.getUrl('submit_review.php');
 
     try {
       var response = await http.post(

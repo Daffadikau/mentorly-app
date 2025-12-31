@@ -8,6 +8,8 @@ import 'profile_pelajar.dart';
 import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
 
+import '../common/api_config.dart';
+
 class DashboardPelajar extends StatefulWidget {
   final Map<String, dynamic> userData;
 
@@ -32,7 +34,7 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
   }
 
   Future<void> loadMentors() async {
-    String uri = "http://localhost/mentorly/select_mentor.php";
+    String uri = ApiConfig.getUrl('select_mentor.php');
     try {
       final respon = await http.get(Uri.parse(uri));
       if (respon.statusCode == 200) {

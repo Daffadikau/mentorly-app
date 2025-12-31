@@ -5,6 +5,8 @@ import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
 import 'profile_mentor.dart';
 
+import '../common/api_config.dart';
+
 class DashboardMentor extends StatefulWidget {
   final Map<String, dynamic> mentorData;
 
@@ -29,7 +31,7 @@ class _DashboardMentorState extends State<DashboardMentor> {
 
   Future<void> loadJadwal() async {
     // GANTI URL INI SESUAI DEVICE KAMU!
-    String uri = "http://localhost/mentorly/select_jadwal.php";
+    String uri = ApiConfig.getUrl('select_jadwal.php');
     var response = await http.post(
       Uri.parse(uri),
       body: {"itemmentorid": currentMentorData['id'].toString()},
@@ -52,7 +54,7 @@ class _DashboardMentorState extends State<DashboardMentor> {
     }
 
     // GANTI URL INI SESUAI DEVICE KAMU!
-    String uri = "http://localhost/mentorly/tarik_dana.php";
+    String uri = ApiConfig.getUrl('tarik_dana.php');
     var response = await http.post(
       Uri.parse(uri),
       body: {

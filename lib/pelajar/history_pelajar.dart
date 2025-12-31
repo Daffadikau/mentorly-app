@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import '../common/api_config.dart';
+
 class HistoryPelajar extends StatefulWidget {
   final Map<String, dynamic> pelajarData;
 
@@ -22,7 +24,7 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
   }
 
   Future<void> loadHistory() async {
-    String uri = "http://localhost/mentorly/get_history.php";
+    String uri = ApiConfig.getUrl('get_history.php');
 
     try {
       var response = await http.post(
@@ -46,7 +48,7 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
   }
 
   Future<void> submitReview(String bookingId, int rating, String review) async {
-    String uri = "http://localhost/mentorly/submit_review.php";
+    String uri = ApiConfig.getUrl('submit_review.php');
 
     var response = await http.post(
       Uri.parse(uri),

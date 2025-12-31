@@ -3,6 +3,8 @@ import '../common/payment_succes.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import '../common/api_config.dart';
+
 class KonfirmasiBooking extends StatelessWidget {
   final Map<String, dynamic> mentorData;
   final Map<String, dynamic> pelajarData;
@@ -22,7 +24,7 @@ class KonfirmasiBooking extends StatelessWidget {
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
-    String uri = "http://localhost/mentorly/create_booking.php";
+    String uri = ApiConfig.getUrl('create_booking.php');
 
     double harga =
         double.tryParse(mentorData['total_penghasilan'].toString()) ?? 20000;

@@ -66,31 +66,47 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(30),
-              child: Image.asset(
-                'assets/images/logot.png',
-                width: 500,
-                height: 500,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final logoSize = constraints.maxHeight < 500
+                ? (constraints.maxHeight * 0.55).clamp(180.0, 320.0)
+                : 320.0;
+
+            return Center(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Image.asset(
+                        'assets/images/logot.png',
+                        width: logoSize,
+                        height: logoSize,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    Text(
+                      "Learn from the Best",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    CircularProgressIndicator(
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.blue[700]!),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
-            ),
-            Text(
-              "Learn from the Best",
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            const SizedBox(height: 5),
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue[700]!),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );

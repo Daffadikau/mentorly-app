@@ -4,6 +4,8 @@ import 'dart:convert';
 import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
 
+import '../common/api_config.dart';
+
 class ProfileMentor extends StatefulWidget {
   final Map<String, dynamic> mentorData;
 
@@ -99,7 +101,7 @@ class _ProfileMentorState extends State<ProfileMentor> {
       isLoading = true;
     });
 
-    String uri = "http://localhost/mentorly/update_profile_mentor.php";
+    String uri = ApiConfig.getUrl('update_profile_mentor.php');
 
     var body = {
       "itemid": widget.mentorData['id'].toString(),

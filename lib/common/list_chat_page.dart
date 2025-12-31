@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'chat_detail.dart';
+import 'api_config.dart';
 import '../utils/session_manager.dart';
 
 class ListChatPage extends StatefulWidget {
@@ -107,7 +108,7 @@ class _ListChatPageState extends State<ListChatPage> {
       return;
     }
 
-    String uri = "http://localhost/mentorly/get_chat_list.php";
+    final uri = ApiConfig.getUrl('get_chat_list.php');
 
     try {
       var response = await http.post(
