@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'register_pelajar.dart';
 import 'dashboard_pelajar.dart';
 import '../utils/session_manager.dart';
+import '../services/notification_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -21,6 +22,13 @@ class _LoginPageState extends State<LoginPage> {
   bool isLoading = false;
   bool _obscurePassword = true;
   int loginAttempts = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Precache logo image to prevent freeze when keyboard appears
+    precacheImage(const AssetImage('assets/images/logodoang.png'), context);
+  }
 
   bool validasi() {
     bool isValid = true;
@@ -74,8 +82,13 @@ class _LoginPageState extends State<LoginPage> {
       final uid = userCredential.user!.uid;
       final user = userCredential.user!;
 
-      // Check if email is verified
-      if (!user.emailVerified) {
+      // Skip email verification for test accounts (testing only!)
+      final email = _email.text.trim().toLowerCase();
+      final isTestAccount =
+          email.contains('test.') || email == 'pelajar@example.com';
+
+      // Check if email is verified (skip for test accounts)
+      if (!user.emailVerified && !isTestAccount) {
         if (mounted) {
           await showDialog(
             context: context,
@@ -183,6 +196,16 @@ class _LoginPageState extends State<LoginPage> {
         userData: pelajarData,
       );
 
+      // Save FCM token for push notifications
+      try {
+        String userId = pelajarData['uid'] ?? pelajarData['id'].toString();
+        await NotificationService.saveFCMToken(userId, 'pelajar');
+        print('✅ FCM token saved for pelajar: $userId');
+      } catch (e) {
+        print('❌ Error saving FCM token: $e');
+        // Don't show error to user, continue with login
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -245,6 +268,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -258,11 +282,13 @@ class _LoginPageState extends State<LoginPage> {
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 20),
               Image.asset(
                 'assets/images/logodoang.png',
-                width: 150,
-                height: 150,
+                width: 120,
+                height: 120,
+                cacheWidth: 240,
+                cacheHeight: 240,
               ),
               const SizedBox(height: 20),
               const Text(

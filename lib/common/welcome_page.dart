@@ -2,81 +2,116 @@ import 'package:flutter/material.dart';
 import '../pelajar/login_pelajar.dart';
 import '../mentor/login_mentor.dart';
 import '../admin/login_admin.dart';
+import '../utils/debug_account_manager.dart';
+import '../utils/firebase_restore_utility.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Precache logo to prevent freeze
+    precacheImage(const AssetImage('assets/images/logodoang.png'), context);
+    
     return Scaffold(
       backgroundColor: Colors.blue[700],
       body: SafeArea(
         child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(30),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(40),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(30),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(40),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Image.asset(
+                      'assets/images/logodoang.png',
+                      width: 100,
+                      height: 100,
+                    ),
                   ),
-                  child: Image.asset(
-                    'assets/images/logodoang.png',
-                    width: 100,
-                    height: 100,
+                  const SizedBox(height: 30),
+                  const Text(
+                    "Selamat Datang di Mentorly",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 40),
-                const Text(
-                  "Selamat Datang di Mentorly",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                  const SizedBox(height: 15),
+                  const Text(
+                    "Siapa untuk naik level?\nDaftar Mentorly sekarang!",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.white70),
                   ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  "Siapa untuk naik level?\nDaftar Mentorly sekarang!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.white70),
-                ),
-                const SizedBox(height: 50),
-                _buildRoleButton(
-                  context,
-                  "Pelajar",
-                  Icons.person,
-                  () => Navigator.push(
+                  const SizedBox(height: 40),
+                  _buildRoleButton(
                     context,
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    "Pelajar",
+                    Icons.person,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginPage()),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 15),
-                _buildRoleButton(
-                  context,
-                  "Mentor",
-                  Icons.school,
-                  () => Navigator.push(
+                  const SizedBox(height: 15),
+                  _buildRoleButton(
                     context,
-                    MaterialPageRoute(
-                        builder: (context) => const LoginMentor()),
+                    "Mentor",
+                    Icons.school,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const LoginMentor()),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 15),
-                _buildRoleButton(
-                  context,
-                  "Admin",
-                  Icons.admin_panel_settings,
-                  () => Navigator.push(
+                  const SizedBox(height: 15),
+                  _buildRoleButton(
                     context,
-                    MaterialPageRoute(builder: (context) => const LoginAdmin()),
+                    "Admin",
+                    Icons.admin_panel_settings,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginAdmin()),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  // Debug button - Remove before production
+                  TextButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const DebugAccountManager()),
+                    ),
+                    icon: const Icon(Icons.bug_report, color: Colors.white70),
+                    label: const Text(
+                      '🔧 Test Account Manager',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ),
+                  // Restore button - Emergency use only
+                  TextButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const FirebaseRestoreUtility()),
+                    ),
+                    icon: Icon(Icons.restore, color: Colors.red[200]),
+                    label: const Text(
+                      '🚨 Firebase Restore',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         ),

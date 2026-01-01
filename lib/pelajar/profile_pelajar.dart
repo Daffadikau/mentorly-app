@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io';
 import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
 
@@ -21,13 +26,16 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
   bool isEditing = false;
   bool _obscurePassword = true;
   bool isLoading = false;
+  bool isUploadingPhoto = false;
+  String? profilePhotoUrl;
 
   @override
   void initState() {
     super.initState();
     _validateSession();
-    _namaController = TextEditingController(text: widget.pelajarData['nama']);
-    _emailController = TextEditingController(text: widget.pelajarData['email']);
+    profilePhotoUrl = widget.pelajarData['profile_photo_url'];
+    _namaController = TextEditingController(text: widget.pelajarData['nama'] ?? widget.pelajarData['nama_lengkap'] ?? '');
+    _emailController = TextEditingController(text: widget.pelajarData['email'] ?? '');
     _phoneController =
         TextEditingController(text: widget.pelajarData['phone'] ?? '');
     _passwordController = TextEditingController();
@@ -101,6 +109,7 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
 
       if (_namaController.text.trim().isNotEmpty) {
         updates['nama'] = _namaController.text.trim();
+        updates['nama_lengkap'] = _namaController.text.trim();
       }
 
       if (_passwordController.text.isNotEmpty) {
@@ -114,6 +123,7 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
       widget.pelajarData['phone'] = _phoneController.text.trim();
       if (_namaController.text.trim().isNotEmpty) {
         widget.pelajarData['nama'] = _namaController.text.trim();
+        widget.pelajarData['nama_lengkap'] = _namaController.text.trim();
       }
 
       // Update session
@@ -140,6 +150,75 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
       if (mounted) {
         setState(() {
           isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _uploadProfilePhoto() async {
+    try {
+      // Pick image file
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+
+      if (result == null) return;
+
+      setState(() {
+        isUploadingPhoto = true;
+      });
+
+      final file = result.files.single;
+      final uid = widget.pelajarData['uid'] ?? widget.pelajarData['id'];
+
+      if (uid == null) {
+        _showError("User ID tidak ditemukan");
+        return;
+      }
+
+      // Upload to Firebase Storage
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_photos/$uid/${file.name}');
+
+      final uploadTask =
+          kIsWeb ? ref.putData(file.bytes!) : ref.putFile(File(file.path!));
+
+      final snapshot = await uploadTask.whenComplete(() => null);
+      final downloadURL = await snapshot.ref.getDownloadURL();
+
+      // Update Firebase RTDB
+      await FirebaseDatabase.instance
+          .ref('pelajar')
+          .child(uid)
+          .update({'profile_photo_url': downloadURL});
+
+      // Update local state and session
+      setState(() {
+        profilePhotoUrl = downloadURL;
+        widget.pelajarData['profile_photo_url'] = downloadURL;
+      });
+
+      await SessionManager.saveSession(
+        userType: 'pelajar',
+        userData: widget.pelajarData,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Foto profil berhasil diupdate"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      _showError("Gagal mengupload foto: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isUploadingPhoto = false;
         });
       }
     }
@@ -175,24 +254,60 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
                 children: [
                   Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Colors.white,
-                        child: Icon(Icons.person,
-                            size: 60, color: Colors.blue[700]),
-                      ),
+                      profilePhotoUrl != null && profilePhotoUrl!.isNotEmpty
+                          ? CircleAvatar(
+                              radius: 60,
+                              backgroundColor: Colors.white,
+                              child: ClipOval(
+                                child: Image.network(
+                                  profilePhotoUrl!,
+                                  width: 120,
+                                  height: 120,
+                                  fit: BoxFit.cover,
+                                  loadingBuilder:
+                                      (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Center(
+                                      child: CircularProgressIndicator(
+                                        value: loadingProgress
+                                                    .expectedTotalBytes !=
+                                                null
+                                            ? loadingProgress
+                                                    .cumulativeBytesLoaded /
+                                                loadingProgress
+                                                    .expectedTotalBytes!
+                                            : null,
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Icon(Icons.person,
+                                        size: 60, color: Colors.blue[700]);
+                                  },
+                                ),
+                              ),
+                            )
+                          : CircleAvatar(
+                              radius: 60,
+                              backgroundColor: Colors.white,
+                              child: Icon(Icons.person,
+                                  size: 60, color: Colors.blue[700]),
+                            ),
+                      if (isUploadingPhoto)
+                        Positioned.fill(
+                          child: CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.black54,
+                            child: const CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       Positioned(
                         bottom: 0,
                         right: 0,
                         child: GestureDetector(
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content:
-                                    Text("Fitur ganti foto akan segera hadir"),
-                              ),
-                            );
-                          },
+                          onTap: isUploadingPhoto ? null : _uploadProfilePhoto,
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: const BoxDecoration(
@@ -215,9 +330,17 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "Ganti Foto Profil",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
                   const SizedBox(height: 15),
                   Text(
-                    widget.pelajarData['nama'],
+                    widget.pelajarData['nama'] ?? widget.pelajarData['nama_lengkap'] ?? 'Pelajar',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -226,7 +349,7 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    widget.pelajarData['email'],
+                    widget.pelajarData['email'] ?? 'email@example.com',
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 14,

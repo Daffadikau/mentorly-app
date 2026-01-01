@@ -1,0 +1,76 @@
+{
+  "rules": {
+    "mentors": {
+      ".read": true,
+      "$uid": {
+        ".read": true,
+        ".write": "$uid === auth.uid || root.child('admin').child(auth.uid).exists()"
+      }
+    },
+    "pelajar": {
+      ".read": "auth != null",
+      "$uid": {
+        ".read": "$uid === auth.uid || root.child('admin').child(auth.uid).exists()",
+        ".write": "$uid === auth.uid || root.child('admin').child(auth.uid).exists()"
+      }
+    },
+    "admin": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "jadwal": {
+      ".read": true,
+      "$mentorUid": {
+        ".read": true,
+        ".write": "$mentorUid === auth.uid || root.child('admin').child(auth.uid).exists()",
+        "$jadwalId": {
+          ".read": true,
+          ".write": "$mentorUid === auth.uid || root.child('admin').child(auth.uid).exists()"
+        }
+      }
+    },
+    "bookings": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["pelajar_id", "mentor_id", "status"],
+      "$bookingId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "chat_rooms": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "messages": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "fcm_tokens": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "notifications": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "calls": {
+      "$callId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

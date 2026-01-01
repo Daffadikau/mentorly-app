@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'detail_mentor_pelajar.dart';
 import 'history_pelajar.dart';
-import '../common/list_chat_page.dart';
+import '../common/chat_list.dart';
 import 'profile_pelajar.dart';
 import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
-
-import '../common/api_config.dart';
+import '../utils/clear_bookings.dart';
+import '../services/session_reminder_service.dart';
+import '../widgets/cached_circle_avatar.dart';
 
 class DashboardPelajar extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -31,22 +32,66 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
   void initState() {
     super.initState();
     loadMentors();
+    
+    // Start session reminder service
+    final userId = widget.userData['uid'] ?? widget.userData['id'].toString();
+    SessionReminderService.startMonitoring(userId);
+    print('🔔 Session reminder service started for user: $userId');
+  }
+
+  @override
+  void dispose() {
+    // Stop session reminder service when leaving dashboard
+    SessionReminderService.stopMonitoring();
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> loadMentors() async {
-    String uri = ApiConfig.getUrl('select_mentor.php');
+    setState(() => isLoading = true);
+
     try {
-      final respon = await http.get(Uri.parse(uri));
-      if (respon.statusCode == 200) {
-        final data = jsonDecode(respon.body);
+      print('🔍 Loading mentors from Firebase...');
+      final snapshot = await FirebaseDatabase.instance.ref('mentors').get();
+
+      if (snapshot.exists && snapshot.value != null) {
+        final data = snapshot.value;
+        List<Map<String, dynamic>> tempList = [];
+
+        if (data is Map) {
+          print('📊 Found ${data.length} mentors in Firebase');
+          data.forEach((key, value) {
+            if (value is Map) {
+              final mentor = Map<String, dynamic>.from(value);
+              // Only show verified mentors
+              if (mentor['status_verifikasi'] == 'verified') {
+                mentor['id'] = key;
+                mentor['uid'] = key;
+                tempList.add(mentor);
+                print('  ✓ Loaded: ${mentor['nama_lengkap']}');
+              } else {
+                print('  ✗ Skipped (not verified): ${mentor['nama_lengkap']}');
+              }
+            }
+          });
+        }
+
+        print('✅ Total verified mentors: ${tempList.length}');
         setState(() {
-          mentorList = data;
-          filteredMentorList = data;
+          mentorList = tempList;
+          filteredMentorList = tempList;
+          isLoading = false;
+        });
+      } else {
+        print('⚠️ No mentors found in Firebase');
+        setState(() {
+          mentorList = [];
+          filteredMentorList = [];
           isLoading = false;
         });
       }
     } catch (e) {
-      print(e);
+      print('❌ Error loading mentors: $e');
       setState(() {
         isLoading = false;
       });
@@ -59,11 +104,11 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
         filteredMentorList = mentorList;
       } else {
         filteredMentorList = mentorList.where((mentor) {
-          return mentor['nama_lengkap']
+          return (mentor['nama_lengkap'] ?? '')
                   .toString()
                   .toLowerCase()
                   .contains(query.toLowerCase()) ||
-              mentor['keahlian']
+              (mentor['bidang_keahlian'] ?? '')
                   .toString()
                   .toLowerCase()
                   .contains(query.toLowerCase());
@@ -84,14 +129,14 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
         filteredMentorList = List.from(mentorList)
           ..sort((a, b) {
             double priceA =
-                double.tryParse(a['total_penghasilan'].toString()) ?? 20000;
+                double.tryParse((a['harga_per_jam'] ?? 0).toString()) ?? 20000;
             double priceB =
-                double.tryParse(b['total_penghasilan'].toString()) ?? 20000;
+                double.tryParse((b['harga_per_jam'] ?? 0).toString()) ?? 20000;
             return priceA.compareTo(priceB);
           });
       } else {
         filteredMentorList = mentorList.where((mentor) {
-          return mentor['keahlian']
+          return (mentor['bidang_keahlian'] ?? '')
               .toString()
               .toLowerCase()
               .contains(category.toLowerCase());
@@ -123,7 +168,10 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ListChatPage(pelajarData: widget.userData),
+          builder: (context) => ChatListPage(
+            userData: widget.userData,
+            userType: 'pelajar',
+          ),
         ),
       ).then((_) {
         setState(() {
@@ -136,10 +184,19 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
         MaterialPageRoute(
           builder: (context) => ProfilePelajar(pelajarData: widget.userData),
         ),
-      ).then((_) {
-        setState(() {
-          _selectedIndex = 0;
-        });
+      ).then((_) async {
+        // Reload session data after returning from profile
+        final userData = await SessionManager.getUserData();
+        if (userData != null) {
+          setState(() {
+            widget.userData.addAll(userData);
+            _selectedIndex = 0;
+          });
+        } else {
+          setState(() {
+            _selectedIndex = 0;
+          });
+        }
       });
     }
   }
@@ -148,11 +205,32 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20),
+      body: Stack(
+        children: [
+          // Watermark logo Mentorly
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.center,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 120),
+                child: Opacity(
+                  opacity: 0.05,
+                  child: Image.asset(
+                    'assets/images/logot.png',
+                    width: 300,
+                    height: 300,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Main content
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -161,12 +239,26 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                     children: [
                       Expanded(
                         child: Text(
-                          "Selamat Datang, ${widget.userData['nama']}.",
+                          "Selamat Datang, ${widget.userData['nama_lengkap'] ?? 'Pelajar'}.",
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_forever,
+                            color: Colors.orange),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const ClearBookingsUtility(),
+                            ),
+                          );
+                        },
+                        tooltip: 'Clear Bookings',
                       ),
                       IconButton(
                         icon: const Icon(Icons.logout, color: Colors.red),
@@ -267,14 +359,11 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                                     padding: const EdgeInsets.all(15),
                                     child: Row(
                                       children: [
-                                        CircleAvatar(
+                                        CachedCircleAvatar(
+                                          imageUrl: mentor['profile_photo_url'],
                                           radius: 30,
                                           backgroundColor: Colors.blue[100],
-                                          child: Icon(
-                                            Icons.person,
-                                            color: Colors.blue[700],
-                                            size: 30,
-                                          ),
+                                          iconColor: Colors.blue[700],
                                         ),
                                         const SizedBox(width: 15),
                                         Expanded(
@@ -283,7 +372,8 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                mentor['nama_lengkap'],
+                                                mentor['nama_lengkap'] ??
+                                                    'Nama tidak tersedia',
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 16,
@@ -291,7 +381,7 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                                               ),
                                               const SizedBox(height: 5),
                                               Text(
-                                                "Rp ${_formatCurrency(mentor['total_penghasilan'])} / jam",
+                                                "Rp ${_formatCurrency(mentor['harga_per_jam'])} / jam",
                                                 style: const TextStyle(
                                                   color: Colors.orange,
                                                   fontWeight: FontWeight.w600,
@@ -300,7 +390,8 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                                               ),
                                               const SizedBox(height: 3),
                                               Text(
-                                                mentor['keahlian'],
+                                                mentor['bidang_keahlian'] ??
+                                                    'Bidang tidak tersedia',
                                                 style: TextStyle(
                                                   color: Colors.grey[600],
                                                   fontSize: 13,
@@ -358,7 +449,9 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                         ),
             ),
           ],
-        ),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
@@ -418,11 +511,5 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]}.',
         );
-  }
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
   }
 }

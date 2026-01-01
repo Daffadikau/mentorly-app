@@ -7,6 +7,7 @@ import 'register_mentor.dart';
 import 'dashboard_mentor.dart';
 import '../utils/session_manager.dart';
 import '../common/api_config.dart';
+import '../services/notification_service.dart';
 
 class LoginMentor extends StatefulWidget {
   const LoginMentor({super.key});
@@ -24,6 +25,13 @@ class _LoginMentorState extends State<LoginMentor> {
   bool isLoading = false;
   bool _obscurePassword = true;
   int loginAttempts = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Precache logo image to prevent freeze when keyboard appears
+    precacheImage(const AssetImage('assets/images/logodoang.png'), context);
+  }
 
   @override
   void dispose() {
@@ -97,8 +105,9 @@ class _LoginMentorState extends State<LoginMentor> {
 
         // Immediately check if this mentor is verified in RTDB - if yes, skip email verification
         print("🔍 Checking RTDB for verification status...");
-        final rtdbSnapshot = await FirebaseDatabase.instance.ref('mentors').child(uid).get();
-        
+        final rtdbSnapshot =
+            await FirebaseDatabase.instance.ref('mentors').child(uid).get();
+
         if (rtdbSnapshot.exists) {
           final mentorData = rtdbSnapshot.value;
           if (mentorData is Map &&
@@ -112,21 +121,25 @@ class _LoginMentorState extends State<LoginMentor> {
         } else {
           print("⚠️ Mentor not found in RTDB with UID: $uid");
           print("🔍 Searching by email in 'mentors' node...");
-          
-          final mentorsSnapshot = await FirebaseDatabase.instance.ref('mentors').get();
-          
+
+          final mentorsSnapshot =
+              await FirebaseDatabase.instance.ref('mentors').get();
+
           if (mentorsSnapshot.exists) {
             final mentorsData = mentorsSnapshot.value;
             print("📊 mentors data type: ${mentorsData.runtimeType}");
-            
+
             String? foundKey;
             Map<String, dynamic>? foundMentor;
-            
+
             if (mentorsData is Map) {
               print("🔍 Searching through Map in 'mentors'...");
               mentorsData.forEach((key, value) {
-                print("  Checking key: $key, email: ${value is Map ? value['email'] : 'N/A'}");
-                if (value is Map && value['email']?.toString().toLowerCase() == _email.text.trim().toLowerCase()) {
+                print(
+                    "  Checking key: $key, email: ${value is Map ? value['email'] : 'N/A'}");
+                if (value is Map &&
+                    value['email']?.toString().toLowerCase() ==
+                        _email.text.trim().toLowerCase()) {
                   foundKey = key;
                   foundMentor = Map<String, dynamic>.from(value);
                   print("✅ Found mentor by email at key: $key");
@@ -138,7 +151,8 @@ class _LoginMentorState extends State<LoginMentor> {
                 final value = mentorsData[i];
                 if (value != null && value is Map) {
                   print("  Checking index: $i, email: ${value['email']}");
-                  if (value['email']?.toString().toLowerCase() == _email.text.trim().toLowerCase()) {
+                  if (value['email']?.toString().toLowerCase() ==
+                      _email.text.trim().toLowerCase()) {
                     foundKey = i.toString();
                     foundMentor = Map<String, dynamic>.from(value);
                     print("✅ Found mentor by email at index: $i");
@@ -147,20 +161,27 @@ class _LoginMentorState extends State<LoginMentor> {
                 }
               }
             }
-            
+
             if (foundMentor != null) {
-              print("📋 Found mentor status: ${foundMentor!['status_verifikasi']}");
+              print(
+                  "📋 Found mentor status: ${foundMentor!['status_verifikasi']}");
               if (foundMentor!['status_verifikasi'] == 'verified') {
-                print("✅ Mentor is verified - copying to correct UID and bypassing email verification");
+                print(
+                    "✅ Mentor is verified - copying to correct UID and bypassing email verification");
                 foundMentor!['uid'] = uid;
-                await FirebaseDatabase.instance.ref('mentors').child(uid).set(foundMentor);
+                await FirebaseDatabase.instance
+                    .ref('mentors')
+                    .child(uid)
+                    .set(foundMentor);
                 print("✅ Mentor data saved to mentors/$uid");
                 isPhpAuth = true;
               } else {
-                print("⚠️ Mentor found but not verified: ${foundMentor!['status_verifikasi']}");
+                print(
+                    "⚠️ Mentor found but not verified: ${foundMentor!['status_verifikasi']}");
               }
             } else {
-              print("❌ No mentor found with email: ${_email.text.trim().toLowerCase()}");
+              print(
+                  "❌ No mentor found with email: ${_email.text.trim().toLowerCase()}");
             }
           } else {
             print("❌ 'mentors' node is empty");
@@ -421,7 +442,13 @@ class _LoginMentorState extends State<LoginMentor> {
       print(
           "📧 Email verification check: emailVerified=${user.emailVerified}, isPhpAuth=$isPhpAuth");
 
-      if (user.emailVerified == false && !isPhpAuth) {
+      // Skip email verification for test accounts (mentor@example.com or mentor.test*)
+      final isTestAccount =
+          _email.text.trim().toLowerCase().contains('mentor@example.com') ||
+              _email.text.trim().toLowerCase().contains('test.') ||
+              _email.text.trim().toLowerCase().contains('mentor.test');
+
+      if (user.emailVerified == false && !isPhpAuth && !isTestAccount) {
         if (mounted) {
           await showDialog(
             context: context,
@@ -629,6 +656,16 @@ class _LoginMentorState extends State<LoginMentor> {
         userType: 'mentor',
         userData: mentorData,
       );
+
+      // Save FCM token for push notifications
+      try {
+        String userId = mentorData['uid'] ?? mentorData['id'].toString();
+        await NotificationService.saveFCMToken(userId, 'mentor');
+        print('✅ FCM token saved for mentor: $userId');
+      } catch (e) {
+        print('❌ Error saving FCM token: $e');
+        // Don't show error to user, continue with login
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

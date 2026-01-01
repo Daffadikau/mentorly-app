@@ -5,6 +5,7 @@ import '../pelajar/dashboard_pelajar.dart';
 import '../mentor/dashboard_mentor.dart';
 import '../admin/dashboard_admin.dart';
 import '../utils/session_manager.dart';
+import '../services/notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,41 +21,79 @@ class _SplashScreenState extends State<SplashScreen> {
     _checkLoginStatus();
   }
 
+  Future<void> _initializeNotifications() async {
+    try {
+      // Wait for context to be ready
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (mounted) {
+        await NotificationService.initialize(context);
+        print('✅ Notification service initialized');
+      }
+    } catch (e) {
+      print('⚠️ Error initializing notifications: $e');
+      // Continue without notifications
+    }
+  }
+
   Future<void> _checkLoginStatus() async {
-    await Future.delayed(const Duration(seconds: 3));
+    try {
+      print('🔍 Checking login status...');
+      
+      // Initialize notifications in background
+      _initializeNotifications();
+      
+      await Future.delayed(const Duration(seconds: 3));
 
-    bool isLoggedIn = await SessionManager.isLoggedIn();
+      bool isLoggedIn = await SessionManager.isLoggedIn();
+      print('📱 Is logged in: $isLoggedIn');
 
-    if (isLoggedIn) {
-      String? userType = await SessionManager.getUserType();
-      Map<String, dynamic>? userData = await SessionManager.getUserData();
+      if (isLoggedIn) {
+        String? userType = await SessionManager.getUserType();
+        Map<String, dynamic>? userData = await SessionManager.getUserData();
+        print('👤 User type: $userType');
 
-      if (userType == 'pelajar' && userData != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DashboardPelajar(userData: userData),
-          ),
-        );
-      } else if (userType == 'mentor' && userData != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DashboardMentor(mentorData: userData),
-          ),
-        );
-      } else if (userType == 'admin') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const DashboardAdmin()),
-        );
+        if (userType == 'pelajar' && userData != null) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DashboardPelajar(userData: userData),
+            ),
+          );
+        } else if (userType == 'mentor' && userData != null) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DashboardMentor(mentorData: userData),
+            ),
+          );
+        } else if (userType == 'admin') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const DashboardAdmin()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const OnboardingPage()),
+          );
+        }
       } else {
+        print('➡️  Navigating to onboarding...');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const OnboardingPage()),
         );
       }
-    } else {
+    } catch (e, stackTrace) {
+      print('❌ Error in splash screen: $e');
+      print('❌ Stack trace: $stackTrace');
+      
+      // Show error and navigate to onboarding
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+      
+      await Future.delayed(const Duration(seconds: 2));
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const OnboardingPage()),

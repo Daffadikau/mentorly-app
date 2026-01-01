@@ -49,39 +49,50 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 itemBuilder: (context, index) {
                   return Padding(
                     padding: const EdgeInsets.all(30),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 280,
-                          height: 280,
-                          decoration: BoxDecoration(
-                            color: Colors.blue[700],
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Icon(
-                              index == 0
-                                  ? Icons.school
-                                  : index == 1
-                                  ? Icons.laptop_mac
-                                  : Icons.trending_up,
-                              size: 120,
-                              color: Colors.white,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final iconSize = constraints.maxHeight > 600 ? 280.0 : constraints.maxHeight * 0.35;
+                        final spacing = constraints.maxHeight > 600 ? 50.0 : 20.0;
+                        
+                        return Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: iconSize,
+                              height: iconSize,
+                              decoration: BoxDecoration(
+                                color: Colors.blue[700],
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  index == 0
+                                      ? Icons.school
+                                      : index == 1
+                                      ? Icons.laptop_mac
+                                      : Icons.trending_up,
+                                  size: iconSize * 0.43,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 50),
-                        Text(
-                          onboardingData[index]["title"]!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[700],
-                            height: 1.5,
-                          ),
-                        ),
-                      ],
+                            SizedBox(height: spacing),
+                            Flexible(
+                              child: Text(
+                                onboardingData[index]["title"]!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[700],
+                                  height: 1.5,
+                                ),
+                                maxLines: 5,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   );
                 },

@@ -21,6 +21,13 @@ class _LoginAdminState extends State<LoginAdmin> {
   int loginAttempts = 0;
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Precache logo image to prevent freeze when keyboard appears
+    precacheImage(const AssetImage('assets/images/logodoang.png'), context);
+  }
+
+  @override
   void dispose() {
     _username.dispose();
     _password.dispose();

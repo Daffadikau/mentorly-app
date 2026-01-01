@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Mentorly needs camera access for video calls</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mentorly needs microphone access for audio/video calls</string>
 </dict>
 </plist>

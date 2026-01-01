@@ -196,8 +196,9 @@ class _ProfileMentorState extends State<ProfileMentor> {
       });
 
       final file = result.files.single;
-      final uid = FirebaseAuth.instance.currentUser?.uid ?? widget.mentorData['uid'];
-      
+      final uid =
+          FirebaseAuth.instance.currentUser?.uid ?? widget.mentorData['uid'];
+
       if (uid == null) {
         _showError("User ID tidak ditemukan");
         return;
@@ -207,15 +208,16 @@ class _ProfileMentorState extends State<ProfileMentor> {
       print("📦 File size: ${file.size} bytes");
 
       // Upload to Firebase Storage
-      final ref = FirebaseStorage.instance.ref().child('profile_photos/$uid/${file.name}');
-      
-      final uploadTask = kIsWeb 
-          ? ref.putData(file.bytes!) 
-          : ref.putFile(File(file.path!));
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_photos/$uid/${file.name}');
+
+      final uploadTask =
+          kIsWeb ? ref.putData(file.bytes!) : ref.putFile(File(file.path!));
 
       final snapshot = await uploadTask.whenComplete(() => null);
       final downloadURL = await snapshot.ref.getDownloadURL();
-      
+
       print("✅ Photo uploaded: $downloadURL");
 
       // Update Firebase RTDB
@@ -289,10 +291,13 @@ class _ProfileMentorState extends State<ProfileMentor> {
                     children: [
                       Builder(
                         builder: (context) {
-                          print("🖼️ Rendering profile photo. URL: $profilePhotoUrl");
-                          print("🔍 Has URL: ${profilePhotoUrl != null && profilePhotoUrl!.isNotEmpty}");
-                          
-                          return profilePhotoUrl != null && profilePhotoUrl!.isNotEmpty
+                          print(
+                              "🖼️ Rendering profile photo. URL: $profilePhotoUrl");
+                          print(
+                              "🔍 Has URL: ${profilePhotoUrl != null && profilePhotoUrl!.isNotEmpty}");
+
+                          return profilePhotoUrl != null &&
+                                  profilePhotoUrl!.isNotEmpty
                               ? CircleAvatar(
                                   radius: 60,
                                   backgroundColor: Colors.white,
@@ -302,25 +307,33 @@ class _ProfileMentorState extends State<ProfileMentor> {
                                       width: 120,
                                       height: 120,
                                       fit: BoxFit.cover,
-                                      loadingBuilder: (context, child, loadingProgress) {
+                                      loadingBuilder:
+                                          (context, child, loadingProgress) {
                                         if (loadingProgress == null) {
                                           print("✅ Image loaded successfully");
                                           return child;
                                         }
-                                        print("⏳ Loading image: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}");
+                                        print(
+                                            "⏳ Loading image: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}");
                                         return Center(
                                           child: CircularProgressIndicator(
-                                            value: loadingProgress.expectedTotalBytes != null
-                                                ? loadingProgress.cumulativeBytesLoaded /
-                                                    loadingProgress.expectedTotalBytes!
+                                            value: loadingProgress
+                                                        .expectedTotalBytes !=
+                                                    null
+                                                ? loadingProgress
+                                                        .cumulativeBytesLoaded /
+                                                    loadingProgress
+                                                        .expectedTotalBytes!
                                                 : null,
                                           ),
                                         );
                                       },
-                                      errorBuilder: (context, error, stackTrace) {
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
                                         print("❌ Error loading image: $error");
                                         print("❌ Stack trace: $stackTrace");
-                                        return Icon(Icons.person, size: 60, color: Colors.blue[700]);
+                                        return Icon(Icons.person,
+                                            size: 60, color: Colors.blue[700]);
                                       },
                                     ),
                                   ),
@@ -328,7 +341,8 @@ class _ProfileMentorState extends State<ProfileMentor> {
                               : CircleAvatar(
                                   radius: 60,
                                   backgroundColor: Colors.white,
-                                  child: Icon(Icons.person, size: 60, color: Colors.blue[700]),
+                                  child: Icon(Icons.person,
+                                      size: 60, color: Colors.blue[700]),
                                 );
                         },
                       ),
@@ -548,7 +562,7 @@ class _ProfileMentorState extends State<ProfileMentor> {
                     SizedBox(
                       width: double.infinity,
                       height: 50,
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         onPressed: () {
                           setState(() {
                             isEditing = true;
@@ -560,8 +574,9 @@ class _ProfileMentorState extends State<ProfileMentor> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: const Text(
-                          "Simpan",
+                        icon: const Icon(Icons.edit, color: Colors.white),
+                        label: const Text(
+                          "Edit Profil",
                           style: TextStyle(fontSize: 16, color: Colors.white),
                         ),
                       ),

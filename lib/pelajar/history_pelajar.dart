@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-
-import '../common/api_config.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:intl/intl.dart';
 
 class HistoryPelajar extends StatefulWidget {
   final Map<String, dynamic> pelajarData;
@@ -14,8 +12,9 @@ class HistoryPelajar extends StatefulWidget {
 }
 
 class _HistoryPelajarState extends State<HistoryPelajar> {
-  List historyList = [];
+  List<Map<String, dynamic>> historyList = [];
   bool isLoading = true;
+  final DatabaseReference _database = FirebaseDatabase.instance.ref();
 
   @override
   void initState() {
@@ -24,23 +23,89 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
   }
 
   Future<void> loadHistory() async {
-    String uri = ApiConfig.getUrl('get_history.php');
+    setState(() => isLoading = true);
 
     try {
-      var response = await http.post(
-        Uri.parse(uri),
-        body: {"itempelajarid": widget.pelajarData['id'].toString()},
-      );
+      final pelajarId = widget.pelajarData['uid'] ?? widget.pelajarData['id'].toString();
+      print('🔍 Loading history for pelajar: $pelajarId');
 
-      if (response.statusCode == 200) {
-        var data = jsonDecode(response.body);
+      // Get all bookings for this pelajar
+      final snapshot = await _database
+          .child('bookings')
+          .orderByChild('pelajar_id')
+          .equalTo(pelajarId)
+          .get();
+
+      if (snapshot.exists) {
+        List<Map<String, dynamic>> tempList = [];
+        Map<dynamic, dynamic> bookings = snapshot.value as Map<dynamic, dynamic>;
+
+        final dateFormat = DateFormat('dd/MM/yyyy');
+        final timeFormat = DateFormat('HH:mm');
+        DateTime now = DateTime.now();
+
+        for (var entry in bookings.entries) {
+          Map<String, dynamic> booking = Map<String, dynamic>.from(entry.value);
+          booking['id'] = entry.key;
+
+          try {
+            // Parse booking date and time
+            DateTime bookingDate = dateFormat.parse(booking['tanggal']);
+            DateTime bookingTime = timeFormat.parse(booking['jam_selesai']);
+            
+            DateTime sessionEndTime = DateTime(
+              bookingDate.year,
+              bookingDate.month,
+              bookingDate.day,
+              bookingTime.hour,
+              bookingTime.minute,
+            );
+
+            // Only show completed or past sessions
+            if (booking['status'] == 'completed' || sessionEndTime.isBefore(now)) {
+              // If session is past but status not updated, update it
+              if (sessionEndTime.isBefore(now) && booking['status'] != 'completed') {
+                await _database
+                    .child('bookings')
+                    .child(entry.key)
+                    .update({'status': 'completed'});
+                booking['status'] = 'completed';
+              }
+              
+              tempList.add(booking);
+              print('✅ Added to history: ${booking['mentor_name']} - ${booking['tanggal']}');
+            }
+          } catch (e) {
+            print('❌ Error parsing date for booking: $e');
+          }
+        }
+
+        // Sort by date descending (newest first)
+        tempList.sort((a, b) {
+          try {
+            DateTime dateA = dateFormat.parse(a['tanggal']);
+            DateTime dateB = dateFormat.parse(b['tanggal']);
+            return dateB.compareTo(dateA);
+          } catch (e) {
+            return 0;
+          }
+        });
+
         setState(() {
-          historyList = data;
+          historyList = tempList;
+          isLoading = false;
+        });
+
+        print('📊 Total history items: ${tempList.length}');
+      } else {
+        print('ℹ️ No bookings found');
+        setState(() {
+          historyList = [];
           isLoading = false;
         });
       }
     } catch (e) {
-      print(e);
+      print('❌ Error loading history: $e');
       setState(() {
         isLoading = false;
       });
@@ -48,25 +113,22 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
   }
 
   Future<void> submitReview(String bookingId, int rating, String review) async {
-    String uri = ApiConfig.getUrl('submit_review.php');
+    try {
+      await _database.child('bookings').child(bookingId).update({
+        'rating': rating,
+        'review': review,
+        'reviewed_at': DateTime.now().millisecondsSinceEpoch,
+      });
 
-    var response = await http.post(
-      Uri.parse(uri),
-      body: {
-        "itembookingid": bookingId,
-        "itemrating": rating.toString(),
-        "itemreview": review,
-      },
-    );
-
-    if (response.statusCode == 200) {
-      var data = jsonDecode(response.body);
-      if (data['status'] == 'success') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Review berhasil dikirim")),
-        );
-        loadHistory();
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Review berhasil dikirim")),
+      );
+      loadHistory();
+    } catch (e) {
+      print('❌ Error submitting review: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Gagal mengirim review")),
+      );
     }
   }
 
@@ -198,14 +260,14 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        booking['nama_mentor'],
+                                        booking['mentor_name'] ?? 'Mentor',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,
                                         ),
                                       ),
                                       Text(
-                                        booking['mata_pelajaran'],
+                                        booking['jadwal_id'] ?? '-',
                                         style: TextStyle(
                                           color: Colors.grey[600],
                                           fontSize: 14,
@@ -253,7 +315,7 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
                                     size: 16, color: Colors.grey[600]),
                                 const SizedBox(width: 5),
                                 Text(
-                                  "${booking['tanggal']} • ${booking['waktu']}",
+                                  "${booking['tanggal']} • ${booking['jam_mulai']} - ${booking['jam_selesai']}",
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey[600],
@@ -261,7 +323,7 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
                                 ),
                                 const Spacer(),
                                 Text(
-                                  "Rp ${_formatCurrency(booking['total_biaya'])}",
+                                  "Rp ${_formatCurrency(booking['harga'] ?? 0)}",
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,

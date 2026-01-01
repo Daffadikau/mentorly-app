@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../common/payment_succes.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_database/firebase_database.dart';
 
 import '../common/api_config.dart';
 
@@ -44,11 +45,14 @@ class KonfirmasiBooking extends StatelessWidget {
         },
       );
 
-      Navigator.pop(context); // Close loading dialog
-
       if (response.statusCode == 200) {
         var data = jsonDecode(response.body);
         if (data['status'] == 'success') {
+          // Create chat room in Firebase after successful booking
+          await _createChatRoom();
+
+          Navigator.pop(context); // Close loading dialog
+
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -61,6 +65,7 @@ class KonfirmasiBooking extends StatelessWidget {
             ),
           );
         } else {
+          Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(data['message'])),
           );
@@ -71,6 +76,55 @@ class KonfirmasiBooking extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: ${e.toString()}")),
       );
+    }
+  }
+
+  Future<void> _createChatRoom() async {
+    try {
+      final DatabaseReference database = FirebaseDatabase.instance.ref();
+
+      String pelajarId = pelajarData['uid'] ?? pelajarData['id'].toString();
+      String mentorId = mentorData['uid'] ?? mentorData['id'].toString();
+
+      // Check if chat room already exists
+      final snapshot = await database
+          .child('chat_rooms')
+          .orderByChild('pelajar_id')
+          .equalTo(pelajarId)
+          .get();
+
+      bool roomExists = false;
+      if (snapshot.exists) {
+        Map<dynamic, dynamic> rooms = snapshot.value as Map<dynamic, dynamic>;
+        for (var room in rooms.values) {
+          if (room['mentor_id'] == mentorId) {
+            roomExists = true;
+            break;
+          }
+        }
+      }
+
+      // Create new chat room only if it doesn't exist
+      if (!roomExists) {
+        await database.child('chat_rooms').push().set({
+          'mentor_id': mentorId,
+          'pelajar_id': pelajarId,
+          'mentor_name': mentorData['nama_lengkap'],
+          'pelajar_name': pelajarData['nama_lengkap'],
+          'created_at': DateTime.now().millisecondsSinceEpoch,
+          'last_message': 'Chat room telah dibuat',
+          'last_message_time': DateTime.now().millisecondsSinceEpoch,
+          'last_sender_id': pelajarId,
+        });
+
+        print(
+            '✅ Chat room created for pelajar $pelajarId and mentor $mentorId');
+      } else {
+        print('ℹ️ Chat room already exists');
+      }
+    } catch (e) {
+      print('❌ Error creating chat room: $e');
+      // Don't throw error - booking should still succeed even if chat room creation fails
     }
   }
 

@@ -6,8 +6,7 @@ import '../common/api_config.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
+import '../common/chat_room_web.dart' if (dart.library.io) '../common/chat_room_stub.dart';
 
 class DetailMentorAdmin extends StatelessWidget {
   final Map<String, dynamic> mentorData;
@@ -512,78 +511,37 @@ class DetailMentorAdmin extends StatelessWidget {
     );
   }
 
-  void _showPdfPreview(BuildContext context, String title, String fileUrl) async {
+  void _showPdfPreview(
+      BuildContext context, String title, String fileUrl) async {
     if (kIsWeb) {
-      // For web, use iframe with direct URL
-      final viewId = 'pdf-${DateTime.now().millisecondsSinceEpoch}';
-      
-      // Register iframe
-      ui_web.platformViewRegistry.registerViewFactory(viewId, (int viewId) {
-        return html.IFrameElement()
-          ..src = fileUrl
-          ..style.border = 'none'
-          ..style.width = '100%'
-          ..style.height = '100%';
-      });
-      
+      // For web, just show a message to open in new tab
       showDialog(
         context: context,
-        builder: (context) => Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(20),
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.9,
-            height: MediaQuery.of(context).size.height * 0.9,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[700],
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(15),
-                      topRight: Radius.circular(15),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.open_in_new, color: Colors.white),
-                        onPressed: () async {
-                          final uri = Uri.parse(fileUrl);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                          }
-                        },
-                        tooltip: 'Buka di Browser',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: HtmlElementView(viewType: viewId),
-                ),
-              ],
-            ),
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Untuk melihat PDF, buka di tab baru:'),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final uri = Uri.parse(fileUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Buka PDF'),
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tutup'),
+            ),
+          ],
         ),
       );
     } else {
@@ -624,11 +582,13 @@ class DetailMentorAdmin extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.open_in_new, color: Colors.white),
+                        icon:
+                            const Icon(Icons.open_in_new, color: Colors.white),
                         onPressed: () async {
                           final uri = Uri.parse(fileUrl);
                           if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            await launchUrl(uri,
+                                mode: LaunchMode.externalApplication);
                           }
                         },
                         tooltip: 'Buka di Browser',
@@ -650,7 +610,8 @@ class DetailMentorAdmin extends StatelessWidget {
                       enableTextSelection: true,
                       canShowScrollHead: true,
                       canShowScrollStatus: true,
-                      onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+                      onDocumentLoadFailed:
+                          (PdfDocumentLoadFailedDetails details) {
                         print("❌ PDF Load Failed: ${details.error}");
                         print("❌ Description: ${details.description}");
                       },

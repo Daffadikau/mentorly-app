@@ -10,7 +10,8 @@ class ApiConfig {
 
   static String getUrl(String endpoint) {
     // PHP backend disabled - all features now use Firebase
-    print("⚠️ Warning: Attempted to call PHP endpoint: $endpoint (PHP backend removed)");
+    print(
+        "⚠️ Warning: Attempted to call PHP endpoint: $endpoint (PHP backend removed)");
     return "";
   }
 }
