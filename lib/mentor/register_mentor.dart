@@ -139,7 +139,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
       print("⚠️ No file selected for $folder");
       return null;
     }
-    
+
     // On mobile path is required, on web bytes are required
     if (!kIsWeb && file.path == null) {
       print("❌ Mobile: No file path for $folder");
@@ -153,7 +153,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
     try {
       print("📤 Starting upload for $folder/${file.name}");
       print("📦 File size: ${file.size} bytes");
-      
+
       final ref =
           FirebaseStorage.instance.ref().child('$folder/$uid/${file.name}');
       print("📍 Storage ref: $folder/$uid/${file.name}");
@@ -165,13 +165,14 @@ class _RegisterMentorState extends State<RegisterMentor> {
 
       // Listen to upload progress
       uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-        final progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        final progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
         print("📊 Progress $folder: ${progress.toStringAsFixed(1)}%");
       });
 
       print("⏳ Awaiting upload completion...");
       final snapshot = await uploadTask.whenComplete(() => null);
-      
+
       print("🔗 Getting download URL...");
       final downloadURL = await snapshot.ref.getDownloadURL();
       print("✅ $folder uploaded: $downloadURL");
@@ -179,7 +180,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
     } catch (e, stackTrace) {
       print("❌ Error uploading $folder: $e");
       print("📜 Stack: $stackTrace");
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -211,7 +212,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
 
     try {
       print("🔄 Starting registration...");
-      
+
       // Create Firebase Auth account
       print("🔄 Creating Firebase Auth account...");
       final userCredential =
@@ -234,13 +235,13 @@ class _RegisterMentorState extends State<RegisterMentor> {
       String? urlPendidikan =
           await _uploadFileToStorage(_filePendidikan, 'pendidikan', uid);
       print("✅ Pendidikan uploaded: ${urlPendidikan != null}");
-      
+
       String? urlKTP = await _uploadFileToStorage(_fileKTP, 'ktp', uid);
       print("✅ KTP uploaded: ${urlKTP != null}");
-      
+
       String? urlSKCK = await _uploadFileToStorage(_fileSKCK, 'skck', uid);
       print("✅ SKCK uploaded: ${urlSKCK != null}");
-      
+
       String? urlSertifikat =
           await _uploadFileToStorage(_fileSertifikat, 'sertifikat', uid);
       print("✅ Sertifikat uploaded: ${urlSertifikat != null}");

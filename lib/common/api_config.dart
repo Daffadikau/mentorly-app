@@ -1,20 +1,16 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 
+// PHP backend removed - App now uses Firebase only
+// This class is kept for backward compatibility but returns empty strings
 class ApiConfig {
-  // Use 10.0.2.2 for Android Emulator to access host machine's localhost
-  // Use your machine's LAN IP (e.g., 192.168.1.x) for physical devices
   static String get baseUrl {
-    if (kReleaseMode) {
-      return "https://your-production-server.com/mentorly";
-    } else if (Platform.isAndroid) {
-      return "http://10.0.2.2:8888/mentorly";
-    } else {
-      // Physical iOS devices cannot reach your Mac via "localhost".
-      // Use the Mac's LAN IP for device testing.
-      return "http://192.168.1.6:8888/mentorly";
-    }
+    // No longer using PHP backend
+    return "";
   }
 
-  static String getUrl(String endpoint) => "$baseUrl/$endpoint";
+  static String getUrl(String endpoint) {
+    // PHP backend disabled - all features now use Firebase
+    print("⚠️ Warning: Attempted to call PHP endpoint: $endpoint (PHP backend removed)");
+    return "";
+  }
 }

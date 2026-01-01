@@ -146,7 +146,8 @@ class _SemuaJadwalMentorState extends State<SemuaJadwalMentor> {
       appBar: AppBar(
         backgroundColor: Colors.blue[700],
         elevation: 0,
-        title: const Text("Semua Jadwal", style: TextStyle(color: Colors.white)),
+        title:
+            const Text("Semua Jadwal", style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),

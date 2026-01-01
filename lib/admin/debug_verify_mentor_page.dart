@@ -3,7 +3,7 @@ import '../utils/manual_verify_mentor.dart';
 
 /// Debug page for manually verifying mentors
 /// Add this to your app temporarily for debugging
-/// 
+///
 /// To use: Navigate to this page from anywhere in your app
 class DebugVerifyMentorPage extends StatefulWidget {
   const DebugVerifyMentorPage({super.key});
@@ -36,11 +36,11 @@ class _DebugVerifyMentorPageState extends State<DebugVerifyMentorPage> {
     });
 
     await ManualVerifyMentor.verifyMentorByUid(_uidController.text.trim());
-    
+
     setState(() {
       _isLoading = false;
     });
-    
+
     _updateOutput('✅ Operation completed - check console for details');
   }
 
@@ -56,11 +56,11 @@ class _DebugVerifyMentorPageState extends State<DebugVerifyMentorPage> {
     });
 
     await ManualVerifyMentor.verifyMentorByEmail(_emailController.text.trim());
-    
+
     setState(() {
       _isLoading = false;
     });
-    
+
     _updateOutput('✅ Operation completed - check console for details');
   }
 
@@ -71,11 +71,11 @@ class _DebugVerifyMentorPageState extends State<DebugVerifyMentorPage> {
     });
 
     await ManualVerifyMentor.listAllMentors();
-    
+
     setState(() {
       _isLoading = false;
     });
-    
+
     _updateOutput('✅ Check console for full mentor list');
   }
 
@@ -86,11 +86,11 @@ class _DebugVerifyMentorPageState extends State<DebugVerifyMentorPage> {
     });
 
     await ManualVerifyMentor.verifyCurrentUser();
-    
+
     setState(() {
       _isLoading = false;
     });
-    
+
     _updateOutput('✅ Operation completed - check console for details');
   }
 
@@ -133,7 +133,7 @@ class _DebugVerifyMentorPageState extends State<DebugVerifyMentorPage> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Verify by UID
             const Text(
               'Verify by UID',
@@ -159,9 +159,9 @@ class _DebugVerifyMentorPageState extends State<DebugVerifyMentorPage> {
                 padding: const EdgeInsets.all(16),
               ),
             ),
-            
+
             const Divider(height: 40),
-            
+
             // Verify by Email
             const Text(
               'Verify by Email',
@@ -188,9 +188,9 @@ class _DebugVerifyMentorPageState extends State<DebugVerifyMentorPage> {
                 padding: const EdgeInsets.all(16),
               ),
             ),
-            
+
             const Divider(height: 40),
-            
+
             // Other actions
             const Text(
               'Other Actions',
@@ -218,9 +218,9 @@ class _DebugVerifyMentorPageState extends State<DebugVerifyMentorPage> {
                 padding: const EdgeInsets.all(16),
               ),
             ),
-            
+
             const Divider(height: 40),
-            
+
             // Output area
             if (_output.isNotEmpty) ...[
               const Text(
@@ -240,13 +240,13 @@ class _DebugVerifyMentorPageState extends State<DebugVerifyMentorPage> {
                 ),
               ),
             ],
-            
+
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Center(child: CircularProgressIndicator()),
               ),
-              
+
             const SizedBox(height: 24),
             Card(
               color: Colors.blue[50],

@@ -73,7 +73,8 @@ class _ReviewPageState extends State<ReviewPage> {
       appBar: AppBar(
         backgroundColor: Colors.blue[700],
         elevation: 0,
-        title: const Text("Berikan Review", style: TextStyle(color: Colors.white)),
+        title:
+            const Text("Berikan Review", style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),

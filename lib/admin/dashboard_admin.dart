@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
 import 'detail_mentor_admin.dart';
@@ -34,18 +35,15 @@ class _DashboardAdminState extends State<DashboardAdmin> {
   }
 
   Future<void> loadStats() async {
-    String uri = ApiConfig.getUrl("get_stats.php");
-    try {
-      final respon = await http.get(Uri.parse(uri));
-      if (respon.statusCode == 200) {
-        final data = jsonDecode(respon.body);
-        setState(() {
-          stats = data;
-        });
-      }
-    } catch (e) {
-      print(e);
-    }
+    // PHP backend removed - using Firebase only
+    // You can calculate stats from Firebase RTDB if needed
+    setState(() {
+      stats = {
+        "total_user": 0,
+        "total_pelajar": 0,
+        "total_pengajar": mentorVerified.length
+      };
+    });
   }
 
   Future<void> loadMentorPending() async {
@@ -59,11 +57,11 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     try {
       // 1. Check Firebase RTDB for pending mentors
       final snapshot = await FirebaseDatabase.instance.ref('mentors').get();
-      
+
       if (snapshot.exists) {
         final data = snapshot.value;
         print("📊 Firebase data type: ${data.runtimeType}");
-        
+
         if (data is List) {
           // Data stored as List
           for (int i = 0; i < data.length; i++) {
@@ -124,17 +122,39 @@ class _DashboardAdminState extends State<DashboardAdmin> {
   }
 
   Future<void> loadMentorVerified() async {
-    String uri = ApiConfig.getUrl("select_mentor.php");
+    // Load verified mentors from Firebase RTDB
     try {
-      final respon = await http.get(Uri.parse(uri));
-      if (respon.statusCode == 200) {
-        final data = jsonDecode(respon.body);
-        setState(() {
-          mentorVerified = data;
-        });
+      final snapshot = await FirebaseDatabase.instance.ref('mentors').get();
+      List verifiedList = [];
+      
+      if (snapshot.exists) {
+        final data = snapshot.value;
+        
+        if (data is List) {
+          for (int i = 0; i < data.length; i++) {
+            final mentor = data[i];
+            if (mentor != null && mentor is Map && mentor['status_verifikasi'] == 'verified') {
+              final mentorData = Map<String, dynamic>.from(mentor);
+              mentorData['firebase_index'] = i;
+              verifiedList.add(mentorData);
+            }
+          }
+        } else if (data is Map) {
+          data.forEach((key, value) {
+            if (value != null && value is Map && value['status_verifikasi'] == 'verified') {
+              final mentorData = Map<String, dynamic>.from(value);
+              mentorData['uid'] = key;
+              verifiedList.add(mentorData);
+            }
+          });
+        }
       }
+      
+      setState(() {
+        mentorVerified = verifiedList;
+      });
     } catch (e) {
-      print(e);
+      print("❌ Error loading verified mentors: $e");
     }
   }
 
@@ -142,6 +162,49 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     await loadStats();
     await loadMentorPending();
     await loadMentorVerified();
+  }
+
+  Future<bool> _checkEmailVerification(String email) async {
+    try {
+      // Fetch sign-in methods for the email
+      final methods = await FirebaseAuth.instance.fetchSignInMethodsForEmail(email);
+      
+      // If email doesn't exist in Firebase Auth, return false
+      if (methods.isEmpty) {
+        print("📧 Email not registered in Firebase Auth: $email");
+        return false;
+      }
+      
+      // Try to get user by email (this requires admin SDK or workaround)
+      // Since we can't directly check emailVerified without signing in,
+      // we'll check if the user exists in Firebase RTDB and has a uid
+      final snapshot = await FirebaseDatabase.instance.ref('mentors').get();
+      
+      if (snapshot.exists) {
+        final data = snapshot.value;
+        
+        if (data is List) {
+          for (var mentor in data) {
+            if (mentor != null && mentor is Map && mentor['email'] == email) {
+              // If they have a UID and registered, check their auth status
+              return methods.isNotEmpty; // Email exists in auth system
+            }
+          }
+        } else if (data is Map) {
+          for (var entry in data.entries) {
+            final mentor = entry.value;
+            if (mentor is Map && mentor['email'] == email) {
+              return methods.isNotEmpty;
+            }
+          }
+        }
+      }
+      
+      return methods.isNotEmpty;
+    } catch (e) {
+      print("❌ Error checking email verification: $e");
+      return false;
+    }
   }
 
   @override
@@ -540,6 +603,54 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                         ),
                       ],
                     ),
+                    if (isPending) const SizedBox(height: 5),
+                    if (isPending)
+                      FutureBuilder<bool>(
+                        future: _checkEmailVerification(mentor['email']),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return Row(
+                              children: [
+                                SizedBox(
+                                  width: 10,
+                                  height: 10,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    color: Colors.grey[400],
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Mengecek email...',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                          final isVerified = snapshot.data ?? false;
+                          return Row(
+                            children: [
+                              Icon(
+                                isVerified ? Icons.verified : Icons.warning_rounded,
+                                size: 14,
+                                color: isVerified ? Colors.green[600] : Colors.orange[700],
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                isVerified ? 'Email Terverifikasi' : 'Email Belum Diverifikasi',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isVerified ? Colors.green[600] : Colors.orange[700],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),

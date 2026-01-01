@@ -94,29 +94,106 @@ class _LoginMentorState extends State<LoginMentor> {
         uid = userCredential.user!.uid;
         user = userCredential.user!;
         print("✅ Firebase Auth login successful");
+
+        // Immediately check if this mentor is verified in RTDB - if yes, skip email verification
+        print("🔍 Checking RTDB for verification status...");
+        final rtdbSnapshot = await FirebaseDatabase.instance.ref('mentors').child(uid).get();
+        
+        if (rtdbSnapshot.exists) {
+          final mentorData = rtdbSnapshot.value;
+          if (mentorData is Map &&
+              mentorData['status_verifikasi'] == 'verified') {
+            print("✅ Mentor verified by admin - BYPASSING email verification");
+            isPhpAuth = true; // Use this flag to skip email verification
+          } else {
+            print(
+                "⚠️ Mentor status: ${mentorData is Map ? mentorData['status_verifikasi'] : 'unknown'}");
+          }
+        } else {
+          print("⚠️ Mentor not found in RTDB with UID: $uid");
+          print("🔍 Searching by email in 'mentors' node...");
+          
+          final mentorsSnapshot = await FirebaseDatabase.instance.ref('mentors').get();
+          
+          if (mentorsSnapshot.exists) {
+            final mentorsData = mentorsSnapshot.value;
+            print("📊 mentors data type: ${mentorsData.runtimeType}");
+            
+            String? foundKey;
+            Map<String, dynamic>? foundMentor;
+            
+            if (mentorsData is Map) {
+              print("🔍 Searching through Map in 'mentors'...");
+              mentorsData.forEach((key, value) {
+                print("  Checking key: $key, email: ${value is Map ? value['email'] : 'N/A'}");
+                if (value is Map && value['email']?.toString().toLowerCase() == _email.text.trim().toLowerCase()) {
+                  foundKey = key;
+                  foundMentor = Map<String, dynamic>.from(value);
+                  print("✅ Found mentor by email at key: $key");
+                }
+              });
+            } else if (mentorsData is List) {
+              print("🔍 Searching through List in 'mentors'...");
+              for (int i = 0; i < mentorsData.length; i++) {
+                final value = mentorsData[i];
+                if (value != null && value is Map) {
+                  print("  Checking index: $i, email: ${value['email']}");
+                  if (value['email']?.toString().toLowerCase() == _email.text.trim().toLowerCase()) {
+                    foundKey = i.toString();
+                    foundMentor = Map<String, dynamic>.from(value);
+                    print("✅ Found mentor by email at index: $i");
+                    break;
+                  }
+                }
+              }
+            }
+            
+            if (foundMentor != null) {
+              print("📋 Found mentor status: ${foundMentor!['status_verifikasi']}");
+              if (foundMentor!['status_verifikasi'] == 'verified') {
+                print("✅ Mentor is verified - copying to correct UID and bypassing email verification");
+                foundMentor!['uid'] = uid;
+                await FirebaseDatabase.instance.ref('mentors').child(uid).set(foundMentor);
+                print("✅ Mentor data saved to mentors/$uid");
+                isPhpAuth = true;
+              } else {
+                print("⚠️ Mentor found but not verified: ${foundMentor!['status_verifikasi']}");
+              }
+            } else {
+              print("❌ No mentor found with email: ${_email.text.trim().toLowerCase()}");
+            }
+          } else {
+            print("❌ 'mentors' node is empty");
+          }
+        }
       } on FirebaseAuthException catch (e) {
         // Firebase Auth failed, check if mentor exists in Firebase RTDB
         print("⚠️ Firebase Auth failed (${e.code}), checking Firebase RTDB...");
 
-        if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        if (e.code == 'user-not-found' ||
+            e.code == 'wrong-password' ||
+            e.code == 'invalid-credential') {
           try {
             // Check all mentors in Firebase RTDB to find by email
-            print("🔍 Checking Firebase RTDB for email: ${_email.text.trim().toLowerCase()}");
-            
+            print(
+                "🔍 Checking Firebase RTDB for email: ${_email.text.trim().toLowerCase()}");
+
             // First, let's see what's at the root
             print("🔍 Checking root database structure...");
             final rootRef = FirebaseDatabase.instance.ref();
             final rootSnapshot = await rootRef.get();
-            
+
             if (rootSnapshot.exists && rootSnapshot.value != null) {
-              print("📊 Root keys: ${(rootSnapshot.value as Map).keys.toList()}");
+              print(
+                  "📊 Root keys: ${(rootSnapshot.value as Map).keys.toList()}");
             } else {
               print("❌ Root is empty");
             }
-            
+
             // Try with unauthenticated read - may require Firebase rules adjustment
-            final mentorsRef = FirebaseDatabase.instance.ref('mentors'); // Note: plural!
-            
+            final mentorsRef =
+                FirebaseDatabase.instance.ref('mentors'); // Note: plural!
+
             DataSnapshot snapshot;
             try {
               snapshot = await mentorsRef.get();
@@ -127,47 +204,56 @@ class _LoginMentorState extends State<LoginMentor> {
             } catch (dbError) {
               print("❌ Firebase RTDB read error: $dbError");
               // If we can't read, the user needs to be registered first
-              throw Exception('Email tidak terdaftar atau belum terverifikasi. Silakan daftar atau hubungi admin.');
+              throw Exception(
+                  'Email tidak terdaftar atau belum terverifikasi. Silakan daftar atau hubungi admin.');
             }
-            
+
             if (snapshot.exists && snapshot.value != null) {
               print("✅ Found mentor node in Firebase RTDB");
-              
+
               String? foundUid;
               Map<String, dynamic>? foundMentor;
-              
+
               // Check if value is a List (array) or Map (object)
               if (snapshot.value is List) {
-                print("📊 Data is a List with ${(snapshot.value as List).length} mentors");
+                print(
+                    "📊 Data is a List with ${(snapshot.value as List).length} mentors");
                 final mentorsList = snapshot.value as List;
-                
+
                 // Search through the list
                 for (int i = 0; i < mentorsList.length; i++) {
                   if (mentorsList[i] != null) {
-                    final mentorData = Map<String, dynamic>.from(mentorsList[i] as Map);
-                    final mentorEmail = mentorData['email']?.toString().toLowerCase() ?? '';
-                    print("  Checking: $mentorEmail vs ${_email.text.trim().toLowerCase()}");
-                    
+                    final mentorData =
+                        Map<String, dynamic>.from(mentorsList[i] as Map);
+                    final mentorEmail =
+                        mentorData['email']?.toString().toLowerCase() ?? '';
+                    print(
+                        "  Checking: $mentorEmail vs ${_email.text.trim().toLowerCase()}");
+
                     if (mentorEmail == _email.text.trim().toLowerCase()) {
                       foundUid = mentorData['id']?.toString() ?? i.toString();
                       foundMentor = mentorData;
-                      print("✅ FOUND MATCH! Index: $i, ID: ${mentorData['id']}");
+                      print(
+                          "✅ FOUND MATCH! Index: $i, ID: ${mentorData['id']}");
                       break;
                     }
                   }
                 }
               } else if (snapshot.value is Map) {
                 print("📊 Data is a Map");
-                final mentors = Map<String, dynamic>.from(snapshot.value as Map);
+                final mentors =
+                    Map<String, dynamic>.from(snapshot.value as Map);
                 print("🔍 Searching through ${mentors.length} mentors...");
-                
+
                 // Find mentor by email
                 mentors.forEach((mentorUid, data) {
                   if (data != null) {
                     final mentorData = Map<String, dynamic>.from(data);
-                    final mentorEmail = mentorData['email']?.toString().toLowerCase() ?? '';
-                    print("  Checking: $mentorEmail vs ${_email.text.trim().toLowerCase()}");
-                    
+                    final mentorEmail =
+                        mentorData['email']?.toString().toLowerCase() ?? '';
+                    print(
+                        "  Checking: $mentorEmail vs ${_email.text.trim().toLowerCase()}");
+
                     if (mentorEmail == _email.text.trim().toLowerCase()) {
                       foundUid = mentorUid;
                       foundMentor = mentorData;
@@ -179,15 +265,18 @@ class _LoginMentorState extends State<LoginMentor> {
                 print("❌ Unexpected data type: ${snapshot.value.runtimeType}");
                 throw Exception('Format data mentor tidak valid');
               }
-              
+
               if (foundMentor != null && foundUid != null) {
-                print("📋 Mentor data: ${foundMentor!['nama_lengkap'] ?? 'No name'}, Status: ${foundMentor!['status_verifikasi'] ?? 'No status'}");
-                
+                print(
+                    "📋 Mentor data: ${foundMentor!['nama_lengkap'] ?? 'No name'}, Status: ${foundMentor!['status_verifikasi'] ?? 'No status'}");
+
                 // Mentor exists in RTDB, check if verified
-                final verificationStatus = foundMentor!['status_verifikasi'] ?? 'pending';
+                final verificationStatus =
+                    foundMentor!['status_verifikasi'] ?? 'pending';
                 if (verificationStatus == 'verified') {
-                  print("✅ Mentor is verified, creating Firebase Auth account...");
-                  
+                  print(
+                      "✅ Mentor is verified, creating Firebase Auth account...");
+
                   // Create Firebase Auth account with the password they entered
                   try {
                     final newUserCredential = await FirebaseAuth.instance
@@ -195,58 +284,70 @@ class _LoginMentorState extends State<LoginMentor> {
                       email: _email.text.trim().toLowerCase(),
                       password: _password.text,
                     );
-                    
+
                     uid = newUserCredential.user!.uid;
                     user = newUserCredential.user!;
-                    
+
                     print("✅ Created Firebase Auth UID: $uid");
-                    
+
                     // Update RTDB with new UID if different
                     if (uid != foundUid) {
-                      print("🔄 Migrating data from $foundUid to new UID $uid...");
+                      print(
+                          "🔄 Migrating data from $foundUid to new UID $uid...");
                       foundMentor!['uid'] = uid;
-                      await FirebaseDatabase.instance.ref('mentors').child(uid).set(foundMentor);
-                      
+                      await FirebaseDatabase.instance
+                          .ref('mentors')
+                          .child(uid)
+                          .set(foundMentor);
+
                       // Try to remove old node (may fail due to permissions)
                       try {
-                        await FirebaseDatabase.instance.ref('mentors').child(foundUid!).remove();
+                        await FirebaseDatabase.instance
+                            .ref('mentors')
+                            .child(foundUid!)
+                            .remove();
                         print("✅ Removed old mentor node");
                       } catch (removeError) {
                         print("⚠️ Could not remove old node: $removeError");
                       }
-                      
+
                       print("✅ Migrated mentor data to new UID: $uid");
                     }
-                    
-                    // Send verification email
-                    try {
-                      await user.sendEmailVerification();
-                      print("✅ Verification email sent");
-                    } catch (emailError) {
-                      print("⚠️ Could not send verification email: $emailError");
-                    }
-                    
-                    isPhpAuth = true;
+
+                    // Skip email verification for admin-verified mentors
+                    print(
+                        "✅ Mentor already verified by admin, skipping email verification");
+                    isPhpAuth = true; // Skip email verification dialog
                   } catch (createError) {
                     print("❌ Failed to create Firebase account: $createError");
-                    if (createError.toString().contains('email-already-in-use')) {
-                      throw Exception('Email sudah terdaftar tapi password salah. Coba reset password atau hubungi admin.');
-                    } else if (createError.toString().contains('weak-password')) {
-                      throw Exception('Password terlalu lemah. Gunakan minimal 6 karakter.');
+                    if (createError
+                        .toString()
+                        .contains('email-already-in-use')) {
+                      throw Exception(
+                          'Email sudah terdaftar tapi password salah. Coba reset password atau hubungi admin.');
+                    } else if (createError
+                        .toString()
+                        .contains('weak-password')) {
+                      throw Exception(
+                          'Password terlalu lemah. Gunakan minimal 6 karakter.');
                     }
-                    throw Exception('Gagal membuat akun: ${createError.toString()}');
+                    throw Exception(
+                        'Gagal membuat akun: ${createError.toString()}');
                   }
                 } else {
                   print("❌ Mentor not verified: $verificationStatus");
-                  throw Exception('Akun Anda masih dalam proses verifikasi oleh admin');
+                  throw Exception(
+                      'Akun Anda masih dalam proses verifikasi oleh admin');
                 }
               } else {
                 print("❌ Mentor not found in RTDB");
-                throw Exception('Email tidak terdaftar. Silakan daftar sebagai mentor terlebih dahulu.');
+                throw Exception(
+                    'Email tidak terdaftar. Silakan daftar sebagai mentor terlebih dahulu.');
               }
             } else {
               print("❌ No mentor node found in Firebase RTDB or empty");
-              throw Exception('Belum ada mentor terdaftar. Silakan daftar terlebih dahulu.');
+              throw Exception(
+                  'Belum ada mentor terdaftar. Silakan daftar terlebih dahulu.');
             }
           } catch (rtdbError) {
             print("❌ Error checking Firebase RTDB: $rtdbError");
@@ -315,7 +416,11 @@ class _LoginMentorState extends State<LoginMentor> {
         }
       */
 
-      // Check if email is verified (skip for RTDB-migrated users initially)
+      // Check if email is verified (skip for admin-verified mentors)
+      // isPhpAuth is set to true earlier if mentor is verified by admin
+      print(
+          "📧 Email verification check: emailVerified=${user.emailVerified}, isPhpAuth=$isPhpAuth");
+
       if (user.emailVerified == false && !isPhpAuth) {
         if (mounted) {
           await showDialog(
@@ -401,8 +506,9 @@ class _LoginMentorState extends State<LoginMentor> {
 
       if (!snapshot.exists) {
         // Profile doesn't exist in Firebase RTDB, check PHP backend
-        print("⚠️ Mentor profile not found in Firebase RTDB, checking PHP backend...");
-        
+        print(
+            "⚠️ Mentor profile not found in Firebase RTDB, checking PHP backend...");
+
         try {
           final response = await http.post(
             Uri.parse(ApiConfig.getUrl("check_mentor_status.php")),
@@ -419,7 +525,7 @@ class _LoginMentorState extends State<LoginMentor> {
               mentorData = Map<String, dynamic>.from(data['mentor_data']);
               mentorData['uid'] = uid;
               mentorData['id'] = uid;
-              
+
               // Save to Firebase RTDB for future logins
               await ref.set(mentorData);
               isVerified = true;
@@ -460,7 +566,7 @@ class _LoginMentorState extends State<LoginMentor> {
         mentorData = Map<String, dynamic>.from(snapshot.value as Map? ?? {});
         mentorData['id'] = uid;
         mentorData['uid'] = uid;
-        
+
         // Check if verified
         if (mentorData['status_verifikasi'] == 'verified') {
           isVerified = true;
@@ -483,7 +589,8 @@ class _LoginMentorState extends State<LoginMentor> {
                 mentorData['status_verifikasi'] = 'verified';
                 // Merge any additional data from PHP backend
                 if (data['mentor_data'] != null) {
-                  final phpData = Map<String, dynamic>.from(data['mentor_data']);
+                  final phpData =
+                      Map<String, dynamic>.from(data['mentor_data']);
                   mentorData.addAll(phpData);
                 }
                 await ref.update({'status_verifikasi': 'verified'});
@@ -540,10 +647,10 @@ class _LoginMentorState extends State<LoginMentor> {
       }
     } catch (e) {
       loginAttempts++;
-      
+
       if (mounted) {
         String errorMessage = "Login gagal. Periksa email dan password Anda.";
-        
+
         if (e is FirebaseAuthException) {
           if (e.code == 'user-not-found') {
             errorMessage = "Akun tidak ditemukan di Firebase";
@@ -559,7 +666,8 @@ class _LoginMentorState extends State<LoginMentor> {
         } else if (e.toString().contains("Login gagal")) {
           errorMessage = e.toString().replaceAll("Exception: ", "");
         } else if (e.toString().contains("Email tidak terdaftar")) {
-          errorMessage = "Email tidak terdaftar. Silakan daftar terlebih dahulu.";
+          errorMessage =
+              "Email tidak terdaftar. Silakan daftar terlebih dahulu.";
         } else if (e.toString().contains("Password salah")) {
           errorMessage = "Password salah. Silakan coba lagi.";
         }

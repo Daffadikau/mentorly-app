@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_database/firebase_database.dart';
 import '../common/api_config.dart';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'dart:html' as html;
+import 'dart:ui_web' as ui_web;
 
 class DetailMentorAdmin extends StatelessWidget {
   final Map<String, dynamic> mentorData;
@@ -10,6 +15,57 @@ class DetailMentorAdmin extends StatelessWidget {
   const DetailMentorAdmin({super.key, required this.mentorData});
 
   Future<void> verifyMentor(BuildContext context, String status) async {
+    print("🔄 Starting verification process...");
+    print("📋 Mentor data: $mentorData");
+
+    // Update Firebase RTDB if this is a Firebase mentor
+    if (mentorData['source'] == 'firebase') {
+      try {
+        print("🔥 Updating Firebase RTDB...");
+        final uid = mentorData['uid'];
+        final firebaseIndex = mentorData['firebase_index'];
+
+        DatabaseReference ref;
+        if (uid != null) {
+          // Data stored as Map with UID keys
+          ref = FirebaseDatabase.instance.ref('mentors/$uid');
+        } else if (firebaseIndex != null) {
+          // Data stored as List with index
+          ref = FirebaseDatabase.instance.ref('mentors/$firebaseIndex');
+        } else {
+          throw Exception("No UID or index found for Firebase mentor");
+        }
+
+        await ref.update({
+          'status_verifikasi': status,
+          'verified_at': DateTime.now().toIso8601String(),
+        });
+        print("✅ Firebase updated successfully");
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  "Mentor berhasil ${status == 'verified' ? 'diverifikasi' : 'ditolak'}"),
+              backgroundColor: status == 'verified' ? Colors.green : Colors.red,
+            ),
+          );
+          Navigator.pop(context, true);
+        }
+        return;
+      } catch (e) {
+        print("❌ Error updating Firebase: $e");
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+    }
+
+    // Update PHP database for PHP mentors
+    print("🔄 Updating PHP database...");
     final uri = ApiConfig.getUrl('verify_mentor.php');
 
     var response = await http.post(
@@ -89,7 +145,8 @@ class DetailMentorAdmin extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                     decoration: BoxDecoration(
                       color: mentorData['status_verifikasi'] == 'pending'
                           ? Colors.orange
@@ -168,29 +225,29 @@ class DetailMentorAdmin extends StatelessWidget {
                   const SizedBox(height: 15),
                   _buildDocumentCard(
                     context,
-                    "KTP", 
-                    Icons.credit_card, 
+                    "KTP",
+                    Icons.credit_card,
                     Colors.green,
                     mentorData['url_ktp'] as String?,
                   ),
                   _buildDocumentCard(
                     context,
-                    "Ijazah Terakhir", 
-                    Icons.description, 
+                    "Ijazah Terakhir",
+                    Icons.description,
                     Colors.blue,
                     mentorData['url_pendidikan'] as String?,
                   ),
                   _buildDocumentCard(
                     context,
-                    "SKCK", 
-                    Icons.verified_user, 
+                    "SKCK",
+                    Icons.verified_user,
                     Colors.purple,
                     mentorData['url_skck'] as String?,
                   ),
                   _buildDocumentCard(
                     context,
-                    "Sertifikat", 
-                    Icons.card_membership, 
+                    "Sertifikat",
+                    Icons.card_membership,
                     Colors.amber,
                     mentorData['url_sertifikat'] as String?,
                   ),
@@ -455,9 +512,163 @@ class DetailMentorAdmin extends StatelessWidget {
     );
   }
 
-  Widget _buildDocumentCard(BuildContext context, String title, IconData icon, MaterialColor color, String? fileUrl) {
+  void _showPdfPreview(BuildContext context, String title, String fileUrl) async {
+    if (kIsWeb) {
+      // For web, use iframe with direct URL
+      final viewId = 'pdf-${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Register iframe
+      ui_web.platformViewRegistry.registerViewFactory(viewId, (int viewId) {
+        return html.IFrameElement()
+          ..src = fileUrl
+          ..style.border = 'none'
+          ..style.width = '100%'
+          ..style.height = '100%';
+      });
+      
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(20),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.9,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[700],
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.open_in_new, color: Colors.white),
+                        onPressed: () async {
+                          final uri = Uri.parse(fileUrl);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        tooltip: 'Buka di Browser',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: HtmlElementView(viewType: viewId),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } else {
+      // For mobile, use Syncfusion PDF viewer
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(20),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            height: MediaQuery.of(context).size.height * 0.9,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[700],
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.open_in_new, color: Colors.white),
+                        onPressed: () async {
+                          final uri = Uri.parse(fileUrl);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        tooltip: 'Buka di Browser',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    color: Colors.grey[300],
+                    child: SfPdfViewer.network(
+                      fileUrl,
+                      enableDoubleTapZooming: true,
+                      enableTextSelection: true,
+                      canShowScrollHead: true,
+                      canShowScrollStatus: true,
+                      onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+                        print("❌ PDF Load Failed: ${details.error}");
+                        print("❌ Description: ${details.description}");
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildDocumentCard(BuildContext context, String title, IconData icon,
+      MaterialColor color, String? fileUrl) {
     bool hasFile = fileUrl != null && fileUrl.isNotEmpty;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
@@ -488,18 +699,12 @@ class DetailMentorAdmin extends StatelessWidget {
           ),
           if (hasFile)
             InkWell(
-              onTap: () async {
-                final uri = Uri.parse(fileUrl);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Tidak dapat membuka file")),
-                  );
-                }
+              onTap: () {
+                _showPdfPreview(context, title, fileUrl);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.blue[50],
                   borderRadius: BorderRadius.circular(20),
@@ -507,10 +712,10 @@ class DetailMentorAdmin extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.download, color: Colors.blue[700], size: 16),
+                    Icon(Icons.visibility, color: Colors.blue[700], size: 16),
                     const SizedBox(width: 5),
                     Text(
-                      "Lihat PDF",
+                      "Preview",
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.blue[700],

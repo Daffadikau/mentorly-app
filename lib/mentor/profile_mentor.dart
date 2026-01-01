@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
-
 import '../common/api_config.dart';
 
 class ProfileMentor extends StatefulWidget {
@@ -27,11 +32,16 @@ class _ProfileMentorState extends State<ProfileMentor> {
   bool isEditing = false;
   bool _obscurePassword = true;
   bool isLoading = false;
+  bool isUploadingPhoto = false;
+  String? profilePhotoUrl;
 
   @override
   void initState() {
     super.initState();
     _validateSession();
+    profilePhotoUrl = widget.mentorData['profile_photo_url'];
+    print("🔍 Profile photo URL from widget: $profilePhotoUrl");
+    print("📋 Full mentor data: ${widget.mentorData}");
     _namaController =
         TextEditingController(text: widget.mentorData['nama_lengkap'] ?? '');
     _emailController = TextEditingController(text: widget.mentorData['email']);
@@ -171,6 +181,80 @@ class _ProfileMentorState extends State<ProfileMentor> {
     }
   }
 
+  Future<void> _uploadProfilePhoto() async {
+    try {
+      // Pick image file
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+
+      if (result == null) return;
+
+      setState(() {
+        isUploadingPhoto = true;
+      });
+
+      final file = result.files.single;
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? widget.mentorData['uid'];
+      
+      if (uid == null) {
+        _showError("User ID tidak ditemukan");
+        return;
+      }
+
+      print("📸 Uploading profile photo for UID: $uid");
+      print("📦 File size: ${file.size} bytes");
+
+      // Upload to Firebase Storage
+      final ref = FirebaseStorage.instance.ref().child('profile_photos/$uid/${file.name}');
+      
+      final uploadTask = kIsWeb 
+          ? ref.putData(file.bytes!) 
+          : ref.putFile(File(file.path!));
+
+      final snapshot = await uploadTask.whenComplete(() => null);
+      final downloadURL = await snapshot.ref.getDownloadURL();
+      
+      print("✅ Photo uploaded: $downloadURL");
+
+      // Update Firebase RTDB
+      await FirebaseDatabase.instance
+          .ref('mentors')
+          .child(uid)
+          .update({'profile_photo_url': downloadURL});
+
+      // Update local state and session
+      setState(() {
+        profilePhotoUrl = downloadURL;
+        widget.mentorData['profile_photo_url'] = downloadURL;
+      });
+
+      await SessionManager.saveSession(
+        userType: 'mentor',
+        userData: widget.mentorData,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Foto profil berhasil diupdate"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print("❌ Error uploading photo: $e");
+      _showError("Gagal mengupload foto: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isUploadingPhoto = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -203,24 +287,66 @@ class _ProfileMentorState extends State<ProfileMentor> {
                 children: [
                   Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Colors.white,
-                        child: Icon(Icons.person,
-                            size: 60, color: Colors.blue[700]),
+                      Builder(
+                        builder: (context) {
+                          print("🖼️ Rendering profile photo. URL: $profilePhotoUrl");
+                          print("🔍 Has URL: ${profilePhotoUrl != null && profilePhotoUrl!.isNotEmpty}");
+                          
+                          return profilePhotoUrl != null && profilePhotoUrl!.isNotEmpty
+                              ? CircleAvatar(
+                                  radius: 60,
+                                  backgroundColor: Colors.white,
+                                  child: ClipOval(
+                                    child: Image.network(
+                                      profilePhotoUrl!,
+                                      width: 120,
+                                      height: 120,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (context, child, loadingProgress) {
+                                        if (loadingProgress == null) {
+                                          print("✅ Image loaded successfully");
+                                          return child;
+                                        }
+                                        print("⏳ Loading image: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}");
+                                        return Center(
+                                          child: CircularProgressIndicator(
+                                            value: loadingProgress.expectedTotalBytes != null
+                                                ? loadingProgress.cumulativeBytesLoaded /
+                                                    loadingProgress.expectedTotalBytes!
+                                                : null,
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stackTrace) {
+                                        print("❌ Error loading image: $error");
+                                        print("❌ Stack trace: $stackTrace");
+                                        return Icon(Icons.person, size: 60, color: Colors.blue[700]);
+                                      },
+                                    ),
+                                  ),
+                                )
+                              : CircleAvatar(
+                                  radius: 60,
+                                  backgroundColor: Colors.white,
+                                  child: Icon(Icons.person, size: 60, color: Colors.blue[700]),
+                                );
+                        },
                       ),
+                      if (isUploadingPhoto)
+                        Positioned.fill(
+                          child: CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.black54,
+                            child: const CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       Positioned(
                         bottom: 0,
                         right: 0,
                         child: GestureDetector(
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content:
-                                    Text("Fitur ganti foto akan segera hadir"),
-                              ),
-                            );
-                          },
+                          onTap: isUploadingPhoto ? null : _uploadProfilePhoto,
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: const BoxDecoration(
