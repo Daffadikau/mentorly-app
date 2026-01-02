@@ -72,6 +72,45 @@ class _JadwalMentorState extends State<JadwalMentor> {
     }
   }
 
+  Future<List<Map<String, dynamic>>> _loadKelasList() async {
+    try {
+      final mentorUid = widget.mentorData['uid'] ?? widget.mentorData['id'];
+      print('Loading kelas for mentor: $mentorUid'); // Debug
+
+      // Load all kelas and filter on client side
+      final snapshot = await FirebaseDatabase.instance.ref('kelas').get();
+
+      if (snapshot.exists && snapshot.value != null) {
+        final data = snapshot.value;
+        List<Map<String, dynamic>> tempList = [];
+
+        if (data is Map) {
+          data.forEach((key, value) {
+            if (value is Map) {
+              final kelasData = Map<String, dynamic>.from(value);
+              // Filter by mentor_uid and active status
+              if (kelasData['mentor_uid'] == mentorUid &&
+                  kelasData['status'] == 'active') {
+                tempList.add({
+                  'id': key,
+                  ...kelasData,
+                });
+              }
+            }
+          });
+        }
+
+        print('Found ${tempList.length} kelas'); // Debug
+        return tempList;
+      }
+      print('No kelas found in database'); // Debug
+      return [];
+    } catch (e) {
+      print('Error loading kelas: $e');
+      return [];
+    }
+  }
+
   Future<void> _deleteJadwal(String jadwalId) async {
     try {
       final mentorUid = widget.mentorData['uid'] ?? widget.mentorData['id'];
@@ -245,16 +284,21 @@ class _JadwalMentorState extends State<JadwalMentor> {
                 ),
               ],
             ),
-            if (jadwal['catatan'] != null && jadwal['catatan'].isNotEmpty) ...[
+            if (jadwal['kelas_name'] != null &&
+                jadwal['kelas_name'].isNotEmpty) ...[
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Icon(Icons.notes, size: 16, color: Colors.grey[600]),
+                  Icon(Icons.class_, size: 16, color: Colors.blue[600]),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      jadwal['catatan'],
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      jadwal['kelas_name'],
+                      style: TextStyle(
+                        color: Colors.blue[700],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -349,152 +393,209 @@ class _JadwalMentorState extends State<JadwalMentor> {
             minute: int.parse(existingJadwal['jam_selesai'].split(':')[1]),
           )
         : const TimeOfDay(hour: 10, minute: 0);
-    final catatanController =
-        TextEditingController(text: existingJadwal?['catatan'] ?? '');
+    String? selectedKelasId = existingJadwal?['kelas_id'];
+    List<Map<String, dynamic>> kelasList = [];
+    bool isLoadingKelas = true;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(isEdit ? 'Edit Jadwal' : 'Tambah Jadwal'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Date Picker
-                const Text('Tanggal',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 90)),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDate = picked);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[400]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 20),
-                        const SizedBox(width: 8),
-                        Text(DateFormat('EEEE, dd MMMM yyyy', 'id_ID')
-                            .format(selectedDate)),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+        builder: (context, setDialogState) {
+          // Load kelas list on dialog open
+          if (isLoadingKelas) {
+            _loadKelasList().then((list) {
+              setDialogState(() {
+                kelasList = list;
+                isLoadingKelas = false;
+              });
+            });
+          }
 
-                // Time Picker - Start
-                const Text('Jam Mulai',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: jamMulai,
-                    );
-                    if (picked != null) {
-                      setDialogState(() => jamMulai = picked);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[400]!),
-                      borderRadius: BorderRadius.circular(8),
+          return AlertDialog(
+            title: Text(isEdit ? 'Edit Jadwal' : 'Tambah Jadwal'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Kelas Dropdown
+                  const Text('Pilih Kelas',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  if (isLoadingKelas)
+                    const Center(child: CircularProgressIndicator())
+                  else if (kelasList.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.orange[700]),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Belum ada kelas. Buat kelas terlebih dahulu.',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    DropdownButtonFormField<String>(
+                      value: selectedKelasId,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                      hint: const Text('Pilih kelas'),
+                      items: kelasList.map((kelas) {
+                        return DropdownMenuItem<String>(
+                          value: kelas['id'],
+                          child: Text(
+                            '${kelas['course_name']} - ${kelas['category']}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedKelasId = value;
+                        });
+                      },
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.access_time, size: 20),
-                        const SizedBox(width: 8),
-                        Text(jamMulai.format(context)),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Time Picker - End
-                const Text('Jam Selesai',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: jamSelesai,
-                    );
-                    if (picked != null) {
-                      setDialogState(() => jamSelesai = picked);
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[400]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.access_time, size: 20),
-                        const SizedBox(width: 8),
-                        Text(jamSelesai.format(context)),
-                      ],
+                  // Date Picker
+                  const Text('Tanggal',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 90)),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDate = picked);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[400]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 20),
+                          const SizedBox(width: 8),
+                          Text(DateFormat('EEEE, dd MMMM yyyy', 'id_ID')
+                              .format(selectedDate)),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                // Notes
-                const Text('Catatan (Opsional)',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: catatanController,
-                  decoration: InputDecoration(
-                    hintText: 'Contoh: Materi tentang Flutter',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                  // Time Picker - Start
+                  const Text('Jam Mulai',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showTimePicker(
+                        context: context,
+                        initialTime: jamMulai,
+                      );
+                      if (picked != null) {
+                        setDialogState(() => jamMulai = picked);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[400]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.access_time, size: 20),
+                          const SizedBox(width: 8),
+                          Text(jamMulai.format(context)),
+                        ],
+                      ),
                     ),
                   ),
-                  maxLines: 2,
-                ),
-              ],
+                  const SizedBox(height: 16),
+
+                  // Time Picker - End
+                  const Text('Jam Selesai',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showTimePicker(
+                        context: context,
+                        initialTime: jamSelesai,
+                      );
+                      if (picked != null) {
+                        setDialogState(() => jamSelesai = picked);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[400]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.access_time, size: 20),
+                          const SizedBox(width: 8),
+                          Text(jamSelesai.format(context)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                _saveJadwal(
-                  selectedDate,
-                  jamMulai,
-                  jamSelesai,
-                  catatanController.text,
-                  jadwalId: existingJadwal?['id'],
-                );
-                Navigator.pop(context);
-              },
-              child: Text(isEdit ? 'Simpan' : 'Tambah'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: kelasList.isEmpty || selectedKelasId == null
+                    ? null
+                    : () {
+                        _saveJadwal(
+                          selectedDate,
+                          jamMulai,
+                          jamSelesai,
+                          selectedKelasId!,
+                          kelasList,
+                          jadwalId: existingJadwal?['id'],
+                        );
+                        Navigator.pop(context);
+                      },
+                child: Text(isEdit ? 'Simpan' : 'Tambah'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -503,7 +604,8 @@ class _JadwalMentorState extends State<JadwalMentor> {
     DateTime tanggal,
     TimeOfDay jamMulai,
     TimeOfDay jamSelesai,
-    String catatan, {
+    String kelasId,
+    List<Map<String, dynamic>> kelasList, {
     String? jadwalId,
   }) async {
     try {
@@ -513,22 +615,44 @@ class _JadwalMentorState extends State<JadwalMentor> {
       final jamSelesaiStr =
           '${jamSelesai.hour.toString().padLeft(2, '0')}:${jamSelesai.minute.toString().padLeft(2, '0')}';
 
+      // Get kelas data
+      final selectedKelas = kelasList.firstWhere((k) => k['id'] == kelasId);
+
       final jadwalData = {
         'mentor_id': mentorUid,
         'tanggal': DateFormat('yyyy-MM-dd').format(tanggal),
         'jam_mulai': jamMulaiStr,
         'jam_selesai': jamSelesaiStr,
         'status': 'available',
-        'catatan': catatan,
+        'kelas_id': kelasId,
+        'kelas_name': selectedKelas['course_name'],
         'created_at': DateTime.now().toIso8601String(),
       };
 
+      String savedJadwalId;
       if (jadwalId != null) {
         // Update existing
         await _jadwalRef.child(mentorUid).child(jadwalId).update(jadwalData);
+        savedJadwalId = jadwalId;
       } else {
         // Add new
-        await _jadwalRef.child(mentorUid).push().set(jadwalData);
+        final newRef = await _jadwalRef.child(mentorUid).push();
+        savedJadwalId = newRef.key!;
+        await newRef.set(jadwalData);
+      }
+
+      // Update kelas jadwal_ids array
+      final kelasRef = FirebaseDatabase.instance.ref('kelas/$kelasId');
+      final kelasSnapshot = await kelasRef.get();
+
+      if (kelasSnapshot.exists) {
+        final kelasData = Map<String, dynamic>.from(kelasSnapshot.value as Map);
+        List<dynamic> jadwalIds = kelasData['jadwal_ids'] ?? [];
+
+        if (!jadwalIds.contains(savedJadwalId)) {
+          jadwalIds.add(savedJadwalId);
+          await kelasRef.update({'jadwal_ids': jadwalIds});
+        }
       }
 
       if (mounted) {

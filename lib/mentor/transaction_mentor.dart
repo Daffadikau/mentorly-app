@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class TransactionMentor extends StatefulWidget {
   final Map<String, dynamic> mentorData;
@@ -192,7 +193,8 @@ class _TransactionMentorState extends State<TransactionMentor> {
                           // Implementasi tarik dana
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text("Fitur tarik dana akan segera tersedia"),
+                              content:
+                                  Text("Fitur tarik dana akan segera tersedia"),
                             ),
                           );
                         },
@@ -213,7 +215,7 @@ class _TransactionMentorState extends State<TransactionMentor> {
               ],
             ),
           ),
-          
+
           // Dana di Proses Card
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -226,8 +228,7 @@ class _TransactionMentorState extends State<TransactionMentor> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Dana di Proses",
-                    style: TextStyle(fontSize: 16)),
+                const Text("Dana di Proses", style: TextStyle(fontSize: 16)),
                 const SizedBox(height: 5),
                 Text(
                   "Rp. ${_formatCurrency(widget.mentorData['dana_proses'])}",
@@ -265,7 +266,36 @@ class _TransactionMentorState extends State<TransactionMentor> {
               ],
             ),
           ),
-          
+
+          const SizedBox(height: 20),
+
+          // Earnings Chart
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.show_chart_rounded,
+                        color: Colors.green[700], size: 24),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Performa Penghasilan",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 15),
+                _buildEarningsChart(double.tryParse(
+                        widget.mentorData['total_penghasilan'].toString()) ??
+                    0),
+              ],
+            ),
+          ),
           const SizedBox(height: 20),
 
           // Filter Chips
@@ -458,6 +488,164 @@ class _TransactionMentorState extends State<TransactionMentor> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEarningsChart(double currentEarnings) {
+    return Container(
+      height: 200,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: currentEarnings == 0
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.show_chart_rounded,
+                      size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Belum ada penghasilan',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total Penghasilan',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Rp ${NumberFormat('#,###', 'id_ID').format(currentEarnings)}',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.green[50],
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.green[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.trending_up,
+                              size: 16, color: Colors.green[700]),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Aktif',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green[700],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: BarChart(
+                    BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
+                      maxY: currentEarnings * 1.5,
+                      barTouchData: BarTouchData(enabled: false),
+                      titlesData: FlTitlesData(
+                        show: true,
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              const months = [
+                                'Jan',
+                                'Feb',
+                                'Mar',
+                                'Apr',
+                                'Mei',
+                                'Jun'
+                              ];
+                              if (value >= 0 && value < months.length) {
+                                return Text(
+                                  months[value.toInt()],
+                                  style: TextStyle(
+                                      fontSize: 10, color: Colors.grey[600]),
+                                );
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        leftTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      gridData: const FlGridData(show: false),
+                      barGroups: List.generate(6, (index) {
+                        double value = index == 5
+                            ? currentEarnings
+                            : currentEarnings * (0.5 + (index * 0.1));
+                        return BarChartGroupData(
+                          x: index,
+                          barRods: [
+                            BarChartRodData(
+                              toY: value,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.green[400]!,
+                                  Colors.green[600]!
+                                ],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                              ),
+                              width: 20,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(6),
+                                topRight: Radius.circular(6),
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

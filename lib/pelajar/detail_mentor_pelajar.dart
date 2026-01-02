@@ -197,14 +197,40 @@ class _DetailMentorState extends State<DetailMentor> {
 
         if (data is Map) {
           print('📊 Found ${data.length} jadwal entries');
+          
+          // Get current date and time
+          final now = DateTime.now();
+          
           data.forEach((key, value) {
             print(
                 '  - Jadwal key: $key, status: ${value is Map ? value['status'] : 'unknown'}');
+            
             if (value is Map && value['status'] == 'available') {
-              tempList.add({
-                'id': key,
-                ...Map<String, dynamic>.from(value),
-              });
+              // Parse jadwal date and time
+              try {
+                final jadwalDate = DateTime.parse(value['tanggal']);
+                final jamMulai = value['jam_mulai'].toString().split(':');
+                final jadwalDateTime = DateTime(
+                  jadwalDate.year,
+                  jadwalDate.month,
+                  jadwalDate.day,
+                  int.parse(jamMulai[0]),
+                  int.parse(jamMulai[1]),
+                );
+                
+                // Only show future schedules
+                if (jadwalDateTime.isAfter(now)) {
+                  tempList.add({
+                    'id': key,
+                    ...Map<String, dynamic>.from(value),
+                  });
+                  print('  ✅ Added: ${value['tanggal']} ${value['jam_mulai']} (future)');
+                } else {
+                  print('  ⏭️ Skipped: ${value['tanggal']} ${value['jam_mulai']} (past)');
+                }
+              } catch (e) {
+                print('  ❌ Error parsing jadwal time: $e');
+              }
             }
           });
         }
@@ -596,24 +622,8 @@ class _DetailMentorState extends State<DetailMentor> {
                     ),
                   ),
                   const SizedBox(height: 25),
-                  const Text(
-                    "Review Siswa",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildReviewCard(
-                    "Christina Anggia",
-                    "Sangat bagus! Penjelasan mudah dipahami.",
-                    5,
-                  ),
-                  _buildReviewCard(
-                    "Budi Santoso",
-                    "Mentor yang sangat sabar dan detail.",
-                    5,
-                  ),
+                  // Real reviews from bookings will be shown here in future update
+                  // For now, removed fake demo reviews
                 ],
               ),
             ),
@@ -693,6 +703,32 @@ class _DetailMentorState extends State<DetailMentor> {
                   onPressed: selectedJadwal == null
                       ? null
                       : () {
+                          // Validate jadwal is not in the past
+                          try {
+                            final now = DateTime.now();
+                            final jadwalDate = DateTime.parse(selectedJadwal!['tanggal']);
+                            final jamMulai = selectedJadwal!['jam_mulai'].toString().split(':');
+                            final jadwalDateTime = DateTime(
+                              jadwalDate.year,
+                              jadwalDate.month,
+                              jadwalDate.day,
+                              int.parse(jamMulai[0]),
+                              int.parse(jamMulai[1]),
+                            );
+                            
+                            if (jadwalDateTime.isBefore(now)) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('❌ Tidak dapat booking jadwal yang sudah lewat'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+                          } catch (e) {
+                            print('Error validating jadwal time: $e');
+                          }
+                          
                           // TODO: Navigate to booking confirmation
                           final dateStr =
                               DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(
@@ -880,65 +916,6 @@ class _DetailMentorState extends State<DetailMentor> {
           fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
-      ),
-    );
-  }
-
-  Widget _buildReviewCard(String name, String review, int rating) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.blue[100],
-                child: Icon(Icons.person, color: Colors.blue[700], size: 20),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Row(
-                      children: List.generate(5, (index) {
-                        return Icon(
-                          index < rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 16,
-                        );
-                      }),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            review,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[700],
-              height: 1.4,
-            ),
-          ),
-        ],
       ),
     );
   }

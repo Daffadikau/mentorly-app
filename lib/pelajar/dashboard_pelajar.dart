@@ -63,20 +63,24 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
           data.forEach((key, value) {
             if (value is Map) {
               final mentor = Map<String, dynamic>.from(value);
-              // Only show verified mentors
-              if (mentor['status_verifikasi'] == 'verified') {
+              
+              // Check if mentor is verified AND active
+              final isVerified = mentor['status_verifikasi'] == 'verified';
+              final isActive = mentor['is_active'] == '1' || mentor['is_active'] == 1 || mentor['is_active'] == true;
+              
+              if (isVerified && isActive) {
                 mentor['id'] = key;
                 mentor['uid'] = key;
                 tempList.add(mentor);
-                print('  ✓ Loaded: ${mentor['nama_lengkap']}');
+                print('  ✓ Loaded: ${mentor['nama_lengkap']} (verified & active)');
               } else {
-                print('  ✗ Skipped (not verified): ${mentor['nama_lengkap']}');
+                print('  ✗ Skipped: ${mentor['nama_lengkap']} (verified: $isVerified, active: $isActive)');
               }
             }
           });
         }
 
-        print('✅ Total verified mentors: ${tempList.length}');
+        print('✅ Total active & verified mentors: ${tempList.length}');
         setState(() {
           mentorList = tempList;
           filteredMentorList = tempList;

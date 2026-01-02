@@ -80,89 +80,10 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       final uid = userCredential.user!.uid;
-      final user = userCredential.user!;
 
-      // Skip email verification for test accounts (testing only!)
-      final email = _email.text.trim().toLowerCase();
-      final isTestAccount =
-          email.contains('test.') || email == 'pelajar@example.com';
+      print('✅ Login successful: $uid');
 
-      // Check if email is verified (skip for test accounts)
-      if (!user.emailVerified && !isTestAccount) {
-        if (mounted) {
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              title: const Text("Verifikasi Diperlukan"),
-              content: const Text(
-                  "Email Anda belum terverifikasi.\n\n1. Cek Inbox/Spam email Anda.\n2. Klik link verifikasi.\n3. Kembali ke sini dan tekan tombol di bawah."),
-              actions: [
-                TextButton(
-                  onPressed: () async {
-                    // Resend verification email
-                    try {
-                      await user.sendEmailVerification();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text("Email verifikasi dikirim ulang!")),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Gagal mengirim ulang: $e")),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text("Kirim Ulang"),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    await FirebaseAuth.instance.signOut();
-                    if (context.mounted) Navigator.pop(context);
-                  },
-                  child: const Text("Batal"),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    await user.reload();
-                    if (FirebaseAuth.instance.currentUser?.emailVerified ==
-                        true) {
-                      if (context.mounted) Navigator.pop(context);
-                    } else {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                "Belum terverifikasi. Silakan cek email lagi."),
-                            backgroundColor: Colors.orange,
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text("Saya Sudah Verifikasi"),
-                ),
-              ],
-            ),
-          );
-
-          // Re-check after dialog closes
-          await user.reload();
-          if (FirebaseAuth.instance.currentUser?.emailVerified != true) {
-            await FirebaseAuth.instance.signOut();
-            if (mounted) {
-              setState(() {
-                isLoading = false;
-              });
-            }
-            return;
-          }
-        }
-      }
+      // No email verification needed - phone already verified during registration
 
       // Fetch user profile from RTDB
       final ref = FirebaseDatabase.instance.ref('pelajar').child(uid);
@@ -183,11 +104,7 @@ class _LoginPageState extends State<LoginPage> {
       pelajarData['id'] = uid;
       pelajarData['uid'] = uid;
 
-      // Sync email_verified status to RTDB
-      if (pelajarData['email_verified'] != true) {
-        await ref.update({'email_verified': true});
-        pelajarData['email_verified'] = true;
-      }
+      // Phone already verified during registration - no need to sync email_verified
 
       loginAttempts = 0;
 

@@ -7,6 +7,7 @@ import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
 import 'detail_mentor_admin.dart';
 import '../common/api_config.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class DashboardAdmin extends StatefulWidget {
   const DashboardAdmin({super.key});
@@ -386,6 +387,72 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 30),
+                      
+                      // Quick Actions Panel
+                      Row(
+                        children: [
+                          Icon(Icons.flash_on_rounded, color: Colors.amber[700], size: 24),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "Aksi Cepat",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildQuickActionCard(
+                              "Pending",
+                              mentorPending.length.toString(),
+                              Icons.pending_outlined,
+                              Colors.orange,
+                              () {
+                                setState(() {
+                                  showVerified = false;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildQuickActionCard(
+                              "Verified",
+                              mentorVerified.length.toString(),
+                              Icons.verified_rounded,
+                              Colors.green,
+                              () {
+                                setState(() {
+                                  showVerified = true;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 30),
+                      
+                      // Chart Section
+                      Row(
+                        children: [
+                          Icon(Icons.pie_chart_rounded, color: Colors.purple[700], size: 24),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "Distribusi Status",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      _buildStatusChart(),
                       const SizedBox(height: 30),
                       
                       // Tab Section
@@ -995,6 +1062,237 @@ class _DashboardAdminState extends State<DashboardAdmin> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildQuickActionCard(
+      String label, String count, IconData icon, MaterialColor color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color[50]!, Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color[200]!, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color[400]!, color[600]!],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Icon(icon, color: Colors.white, size: 28),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              count,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: color[700],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChart() {
+    int pending = mentorPending.length;
+    int verified = mentorVerified.length;
+    int total = pending + verified;
+    
+    if (total == 0) {
+      return Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.pie_chart_outline, size: 48, color: Colors.grey[400]),
+              const SizedBox(height: 12),
+              Text(
+                'Belum ada data untuk ditampilkan',
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 200,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 40,
+                sections: [
+                  PieChartSectionData(
+                    value: pending.toDouble(),
+                    title: '${(pending / total * 100).toInt()}%',
+                    color: Colors.orange[400],
+                    radius: 50,
+                    titleStyle: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  PieChartSectionData(
+                    value: verified.toDouble(),
+                    title: '${(verified / total * 100).toInt()}%',
+                    color: Colors.green[400],
+                    radius: 50,
+                    titleStyle: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            flex: 2,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildLegendItem(
+                  'Pending',
+                  pending.toString(),
+                  Colors.orange[400]!,
+                ),
+                const SizedBox(height: 12),
+                _buildLegendItem(
+                  'Verified',
+                  verified.toString(),
+                  Colors.green[400]!,
+                ),
+                const SizedBox(height: 12),
+                Divider(color: Colors.grey[300], thickness: 1),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    Text(
+                      total.toString(),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[900],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, String value, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+      ],
     );
   }
 }

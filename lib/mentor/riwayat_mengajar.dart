@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:intl/intl.dart';
+import '../widgets/cached_circle_avatar.dart';
 
 class RiwayatMengajar extends StatefulWidget {
   final Map<String, dynamic> mentorData;
@@ -28,57 +30,78 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
     });
 
     try {
-      final uid = widget.mentorData['uid'];
-      final snapshot = await _database.child('jadwal').child(uid).get();
+      final mentorId = widget.mentorData['uid'] ?? widget.mentorData['id'].toString();
+      print('🔍 Loading riwayat for mentor: $mentorId');
+
+      // Get all bookings for this mentor
+      final snapshot = await _database
+          .child('bookings')
+          .orderByChild('mentor_id')
+          .equalTo(mentorId)
+          .get();
 
       List<Map<String, dynamic>> tempList = [];
 
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
+        DateTime now = DateTime.now();
 
         for (var entry in data.entries) {
-          final jadwalData = Map<String, dynamic>.from(entry.value as Map);
-          jadwalData['jadwal_id'] = entry.key;
+          final booking = Map<String, dynamic>.from(entry.value as Map);
+          booking['id'] = entry.key;
 
-          // Hanya ambil jadwal yang sudah selesai (completed) atau yang tanggalnya sudah lewat
-          final tanggal = DateTime.parse(jadwalData['tanggal']);
-          final now = DateTime.now();
-          final isCompleted = jadwalData['status'] == 'completed';
-          final isPast = tanggal.isBefore(DateTime(now.year, now.month, now.day));
+          try {
+            // Parse booking date and time
+            DateTime bookingDate = DateTime.parse(booking['tanggal']);
+            List<String> timeParts = booking['jam_selesai'].toString().split(':');
+            DateTime sessionEndTime = DateTime(
+              bookingDate.year,
+              bookingDate.month,
+              bookingDate.day,
+              int.parse(timeParts[0]),
+              int.parse(timeParts[1]),
+            );
 
-          if (isCompleted || (isPast && jadwalData['status'] == 'booked')) {
-            // Load student data if booked
-            if (jadwalData['booked_by'] != null) {
-              try {
-                final studentSnapshot = await _database
-                    .child('pelajar')
-                    .child(jadwalData['booked_by'])
-                    .get();
-
-                if (studentSnapshot.exists) {
-                  final studentData = studentSnapshot.value as Map;
-                  jadwalData['student_name'] = studentData['nama_lengkap'] ?? 
-                                                 studentData['email'] ?? 
-                                                 'Pelajar';
-                  jadwalData['student_uid'] = jadwalData['booked_by'];
-                  jadwalData['student_email'] = studentData['email'];
-                }
-              } catch (e) {
-                print("Error loading student: $e");
-                jadwalData['student_name'] = 'Pelajar';
-              }
+            // Show completed or past sessions
+            bool shouldShow = false;
+            
+            if (booking['status'] == 'completed') {
+              shouldShow = true;
+            } else if (booking['status'] == 'confirmed' && sessionEndTime.isBefore(now)) {
+              // Auto-update past confirmed sessions to completed
+              await _database
+                  .child('bookings')
+                  .child(entry.key)
+                  .update({'status': 'completed'});
+              booking['status'] = 'completed';
+              shouldShow = true;
             }
-
-            tempList.add(jadwalData);
+            
+            if (shouldShow) {
+              tempList.add(booking);
+              print('✅ Added to riwayat: ${booking['pelajar_name']} - ${booking['tanggal']} (${booking['status']})');
+              print('   📋 Booking data keys: ${booking.keys.toList()}');
+              print('   👤 pelajar_id: ${booking['pelajar_id']}');
+            }
+          } catch (e) {
+            print("❌ Error parsing booking date: $e");
           }
         }
 
         // Sort by date descending (newest first)
         tempList.sort((a, b) {
-          final dateA = DateTime.parse(a['tanggal']);
-          final dateB = DateTime.parse(b['tanggal']);
-          return dateB.compareTo(dateA);
+          try {
+            final dateA = DateTime.parse(a['tanggal']);
+            final dateB = DateTime.parse(b['tanggal']);
+            return dateB.compareTo(dateA);
+          } catch (e) {
+            return 0;
+          }
         });
+
+        print('📊 Total riwayat items: ${tempList.length}');
+      } else {
+        print('ℹ️ No bookings found for this mentor');
       }
 
       setState(() {
@@ -86,7 +109,7 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
         isLoading = false;
       });
     } catch (e) {
-      print("Error loading riwayat: $e");
+      print("❌ Error loading riwayat: $e");
       setState(() {
         isLoading = false;
       });
@@ -307,23 +330,39 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                   ),
                 ],
               ),
-              if (riwayat['student_name'] != null) ...[
+              if (riwayat['pelajar_name'] != null) ...[
                 const SizedBox(height: 12),
                 const Divider(height: 1),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue[50],
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.person_rounded,
-                        size: 20,
-                        color: Colors.blue[700],
-                      ),
+                    // Display student profile photo
+                    FutureBuilder<String>(
+                      future: _getStudentPhotoUrl(riwayat['pelajar_id']),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                          return CachedCircleAvatar(
+                            imageUrl: snapshot.data!,
+                            radius: 24,
+                            backgroundColor: Colors.blue[100],
+                            fallbackIcon: Icons.person,
+                            iconColor: Colors.blue[700],
+                          );
+                        }
+                        return Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.blue[100],
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.person_rounded,
+                            size: 24,
+                            color: Colors.blue[700],
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -339,7 +378,7 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            riwayat['student_name'],
+                            riwayat['pelajar_name'] ?? 'Pelajar',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -349,7 +388,82 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                         ],
                       ),
                     ),
+                    if (riwayat['harga'] != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green[200]!),
+                        ),
+                        child: Text(
+                          "Rp ${_formatCurrency(riwayat['harga'])}",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green[700],
+                          ),
+                        ),
+                      ),
                   ],
+                ),
+              ],
+              // Display review if exists
+              if (riwayat['rating'] != null && int.tryParse(riwayat['rating'].toString()) != null && int.parse(riwayat['rating'].toString()) > 0) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.amber[50]!, Colors.orange[50]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.star_rounded, size: 18, color: Colors.amber[700]),
+                          const SizedBox(width: 6),
+                          Text(
+                            "Review dari Pelajar",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber[900],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: List.generate(5, (i) {
+                          return Icon(
+                            i < int.parse(riwayat['rating'].toString())
+                                ? Icons.star
+                                : Icons.star_border,
+                            color: Colors.amber[700],
+                            size: 20,
+                          );
+                        }),
+                      ),
+                      if (riwayat['review'] != null && riwayat['review'].toString().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          riwayat['review'],
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[800],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ],
               if (riwayat['catatan'] != null && riwayat['catatan'].toString().isNotEmpty) ...[
@@ -398,5 +512,44 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
         ),
       ),
     );
+  }
+
+  Future<String> _getStudentPhotoUrl(String? studentId) async {
+    if (studentId == null || studentId.isEmpty) {
+      print('⚠️ Student ID is null or empty');
+      return '';
+    }
+    
+    print('📸 Trying to load photo for student: $studentId');
+    
+    try {
+      // Get photo URL from database instead of constructing path
+      final snapshot = await _database
+          .child('pelajar')
+          .child(studentId)
+          .child('profile_photo_url')
+          .get();
+      
+      if (snapshot.exists && snapshot.value != null) {
+        final url = snapshot.value.toString();
+        print('✅ Photo URL found from database: $url');
+        return url;
+      } else {
+        print('⚠️ No profile_photo_url in database for $studentId');
+        return '';
+      }
+    } catch (e) {
+      print('❌ Error loading photo for $studentId: $e');
+      return '';
+    }
+  }
+
+  String _formatCurrency(dynamic value) {
+    try {
+      double amount = double.parse(value.toString());
+      return NumberFormat('#,###', 'id_ID').format(amount);
+    } catch (e) {
+      return value.toString();
+    }
   }
 }

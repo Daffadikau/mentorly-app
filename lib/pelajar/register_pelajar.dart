@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_pelajar.dart';
+import 'phone_verification_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -46,6 +47,12 @@ class _RegisterPageState extends State<RegisterPage> {
       if (_phone.text.isEmpty) {
         errorPhone = "Nomor telepon tidak boleh kosong";
         isValid = false;
+      } else if (!_phone.text.startsWith('+')) {
+        errorPhone = "Format: +62xxx (gunakan kode negara)";
+        isValid = false;
+      } else if (_phone.text.length < 10) {
+        errorPhone = "Nomor telepon terlalu pendek";
+        isValid = false;
       } else {
         errorPhone = null;
       }
@@ -57,46 +64,142 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _register() async {
     if (!validasi()) return;
 
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
     try {
-      // Create Firebase Auth account
-      final userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _email.text.trim().toLowerCase(),
+      print('📱 Starting phone verification for: ${_phone.text}');
+      
+      // Start phone verification
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: _phone.text.trim(),
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Auto-verification (Android only)
+          print('✅ Auto-verification completed');
+          Navigator.pop(context); // Close loading dialog
+          
+          // Proceed with registration
+          await _completeRegistration(credential, null);
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          print('❌ Phone verification failed: ${e.message}');
+          Navigator.pop(context); // Close loading dialog
+          
+          String errorMessage = 'Verifikasi nomor gagal';
+          if (e.code == 'invalid-phone-number') {
+            errorMessage = 'Format nomor telepon tidak valid. Gunakan format: +62xxx';
+          } else if (e.code == 'too-many-requests') {
+            errorMessage = 'Terlalu banyak percobaan. Coba lagi nanti';
+          } else {
+            errorMessage = 'Error: ${e.message}';
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage)),
+          );
+        },
+        codeSent: (String verificationId, int? resendToken) async {
+          print('📨 Verification code sent');
+          Navigator.pop(context); // Close loading dialog
+          
+          // Navigate to verification page
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PhoneVerificationPage(
+                phoneNumber: _phone.text.trim(),
+                verificationId: verificationId,
+                email: _email.text.trim().toLowerCase(),
+                password: _password.text,
+                additionalData: {
+                  'phone': _phone.text.trim(),
+                },
+              ),
+            ),
+          );
+          
+          // Handle result from verification page
+          if (result != null && result['success'] == true) {
+            await _completeRegistration(null, result);
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          print('⏱️ Auto retrieval timeout');
+        },
+      );
+      
+    } catch (e) {
+      print('❌ Error starting phone verification: $e');
+      Navigator.pop(context); // Close loading dialog
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan: $e')),
+      );
+    }
+  }
+
+  Future<void> _completeRegistration(
+    PhoneAuthCredential? phoneCredential,
+    Map<String, dynamic>? verificationResult,
+  ) async {
+    try {
+      print('📝 Starting registration completion...');
+      final normalizedEmail = _email.text.trim().toLowerCase();
+      final phoneNumber = verificationResult?['phoneNumber'] ?? _phone.text.trim();
+
+      // 1. Create email/password account first
+      print('🔐 Creating email/password account...');
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: normalizedEmail,
         password: _password.text,
       );
 
-      final uid = userCredential.user!.uid;
-      final user = userCredential.user!;
+      final user = userCredential.user;
+      if (user == null) {
+        throw Exception('Failed to create account');
+      }
 
-      // 1. Send Email Verification
-      await user.sendEmailVerification();
+      print('✅ Email/password account created: ${user.uid}');
 
-      // Save user profile to RTDB
-      final ref = FirebaseDatabase.instance.ref('pelajar').child(uid);
-
-      final normalizedEmail = _email.text.trim().toLowerCase();
+      // 2. Save user profile to RTDB
+      print('💾 Saving profile to database...');
+      final ref = FirebaseDatabase.instance.ref('pelajar').child(user.uid);
+      
       final profileData = {
         'email': normalizedEmail,
-        'phone': _phone.text.trim(),
+        'phone': phoneNumber,
         'created_at': DateTime.now().toIso8601String(),
-        'uid': uid,
+        'uid': user.uid,
         'email_verified': false,
+        'phone_verified': true, // Already verified via SMS
+        'auth_method': 'email', // Login uses email/password
+        'phone_verification_date': DateTime.now().toIso8601String(),
       };
 
       await ref.set(profileData);
+      
+      print('✅ Profile saved to database');
 
-      // 2. Sign out immediately so they can't access dashboard yet
+      // 3. Sign out so user needs to login with email/password
       await FirebaseAuth.instance.signOut();
 
       if (mounted) {
-        // 3. Show Verification Dialog
+        // Show success dialog
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (context) => AlertDialog(
-            title: const Text("Verifikasi Email"),
-            content: Text(
-                "Link verifikasi telah dikirim ke ${_email.text}. Silakan cek email Anda untuk mengaktifkan akun sebelum login."),
+            title: const Text("Registrasi Berhasil! 🎉"),
+            content: const Text(
+              "Nomor telepon Anda telah terverifikasi dan akun telah dibuat.\n\nSilakan login dengan email dan password Anda.",
+            ),
             actions: [
               TextButton(
                 onPressed: () {
@@ -106,33 +209,32 @@ class _RegisterPageState extends State<RegisterPage> {
                     MaterialPageRoute(builder: (context) => const LoginPage()),
                   );
                 },
-                child: const Text("Ke Halaman Login"),
+                child: const Text("Login Sekarang"),
               ),
             ],
           ),
         );
       }
-    } on FirebaseAuthException catch (e) {
-      String errorMessage = 'Gagal registrasi';
-      if (e.code == 'weak-password') {
-        errorMessage = 'Password terlalu lemah';
-      } else if (e.code == 'email-already-in-use') {
-        errorMessage = 'Email sudah terdaftar';
-      } else if (e.code == 'configuration-not-found' ||
-          e.code == 'operation-not-allowed') {
-        errorMessage =
-            'Login Email/Password belum diaktifkan di Firebase Console';
-      } else {
-        errorMessage = 'Gagal (${e.code}): ${e.message}';
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
-      );
+      
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan: $e')),
-      );
+      print('❌ Error completing registration: $e');
+      
+      if (mounted) {
+        String errorMessage = 'Gagal menyimpan data';
+        if (e.toString().contains('email-already-in-use')) {
+          errorMessage = 'Email sudah terdaftar. Silakan gunakan email lain atau login.';
+        } else if (e.toString().contains('weak-password')) {
+          errorMessage = 'Password terlalu lemah. Minimal 6 karakter.';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ $errorMessage'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -198,11 +300,14 @@ class _RegisterPageState extends State<RegisterPage> {
               const SizedBox(height: 20),
               TextField(
                 controller: _phone,
+                keyboardType: TextInputType.phone,
                 decoration: InputDecoration(
-                  labelText: "Phone Number",
-                  hintText: "Phone Number",
+                  labelText: "Nomor Telepon",
+                  hintText: "+62xxx (contoh: +628123456789)",
                   errorText: errorPhone,
                   border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.phone),
+                  helperText: "Gunakan kode negara (+62 untuk Indonesia)",
                 ),
               ),
               const SizedBox(height: 30),

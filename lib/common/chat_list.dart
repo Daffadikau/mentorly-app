@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import '../widgets/cached_circle_avatar.dart';
 import 'chat_room.dart';
 
 class ChatListPage extends StatefulWidget {
@@ -145,6 +146,51 @@ class _ChatListPageState extends State<ChatListPage> {
             };
           }
 
+          // Load booking info to get mata_pelajaran and session details
+          try {
+            final bookingSnapshot = await _database
+                .child('bookings')
+                .orderByChild(widget.userType == 'mentor' ? 'mentor_id' : 'pelajar_id')
+                .equalTo(currentUserId)
+                .get();
+
+            if (bookingSnapshot.exists) {
+              Map<dynamic, dynamic> bookings = bookingSnapshot.value as Map<dynamic, dynamic>;
+              // Find booking between current user and other user
+              for (var bookingEntry in bookings.entries) {
+                var booking = bookingEntry.value;
+                String bookingOtherUserId = widget.userType == 'mentor' 
+                    ? booking['pelajar_id'].toString()
+                    : booking['mentor_id'].toString();
+                
+                if (bookingOtherUserId == otherUserId) {
+                  // Load jadwal info to get mata_pelajaran
+                  String jadwalId = booking['jadwal_id'].toString();
+                  String jadwalMentorId = booking['mentor_id'].toString();
+                  
+                  final jadwalSnapshot = await _database
+                      .child('jadwal')
+                      .child(jadwalMentorId)
+                      .child(jadwalId)
+                      .get();
+                  
+                  if (jadwalSnapshot.exists) {
+                    var jadwalData = jadwalSnapshot.value as Map<dynamic, dynamic>;
+                    room['mata_pelajaran'] = jadwalData['mata_pelajaran'] ?? 'Sesi Mentoring';
+                    room['tanggal'] = booking['tanggal'] ?? '';
+                    room['jam_mulai'] = booking['jam_mulai'] ?? '';
+                    room['jam_selesai'] = booking['jam_selesai'] ?? '';
+                    print('📚 Loaded mata pelajaran: ${room['mata_pelajaran']}');
+                  }
+                  break; // Use first matching booking
+                }
+              }
+            }
+          } catch (e) {
+            print('⚠️ Error loading booking info: $e');
+            // Continue without booking info
+          }
+
           rooms.add(room);
         }
 
@@ -268,17 +314,46 @@ class _ChatListPageState extends State<ChatListPage> {
       elevation: 1,
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          radius: 28,
-          backgroundColor: Colors.blue[100],
-          child: Text(
-            name[0].toUpperCase(),
-            style: TextStyle(
-              color: Colors.blue[700],
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+        leading: FutureBuilder<String>(
+          future: _getOtherUserPhotoUrl(chatRoom),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return CircleAvatar(
+                radius: 28,
+                backgroundColor: Colors.grey[300],
+                child: const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                  ),
+                ),
+              );
+            }
+            
+            if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+              return CachedCircleAvatar(
+                imageUrl: snapshot.data!,
+                radius: 28,
+                fallbackIcon: Icons.person,
+              );
+            }
+            
+            // Fallback to first letter
+            return CircleAvatar(
+              radius: 28,
+              backgroundColor: Colors.blue[100],
+              child: Text(
+                name[0].toUpperCase(),
+                style: TextStyle(
+                  color: Colors.blue[700],
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            );
+          },
         ),
         title: Text(
           name,
@@ -289,14 +364,42 @@ class _ChatListPageState extends State<ChatListPage> {
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            displayMessage,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Show mata pelajaran for mentor to differentiate students
+              if (widget.userType == 'mentor' && chatRoom['mata_pelajaran'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Icon(Icons.book, size: 14, color: Colors.blue[700]),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          chatRoom['mata_pelajaran'],
+                          style: TextStyle(
+                            color: Colors.blue[700],
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              Text(
+                displayMessage,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+            ],
           ),
         ),
         trailing: Column(
@@ -333,5 +436,30 @@ class _ChatListPageState extends State<ChatListPage> {
         },
       ),
     );
+  }
+
+  // Get other user's photo URL from database
+  Future<String> _getOtherUserPhotoUrl(Map<String, dynamic> chatRoom) async {
+    try {
+      // Get other user data that was loaded in _loadChatRooms
+      final otherUser = chatRoom['other_user'];
+      if (otherUser == null) {
+        print('⚠️ Other user data not found in chat room');
+        return '';
+      }
+
+      // Check if profile_photo_url exists
+      final photoUrl = otherUser['profile_photo_url'];
+      if (photoUrl != null && photoUrl.toString().isNotEmpty) {
+        print('✅ Photo URL found for ${otherUser['nama_lengkap']}: $photoUrl');
+        return photoUrl.toString();
+      }
+
+      print('⚠️ No photo URL for ${otherUser['nama_lengkap']}');
+      return '';
+    } catch (e) {
+      print('❌ Error getting photo URL: $e');
+      return '';
+    }
   }
 }

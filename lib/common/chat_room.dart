@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher.dart';
 import 'video_call_screen.dart';
 import 'incoming_call_dialog.dart';
 import 'dart:async';
@@ -45,6 +47,7 @@ class _ChatRoomState extends State<ChatRoom> {
   double uploadProgress = 0.0;
   StreamSubscription? _callSubscription;
   Map<String, dynamic>? bookingData;
+  Map<String, dynamic>? jadwalData;
 
   @override
   void initState() {
@@ -76,10 +79,35 @@ class _ChatRoomState extends State<ChatRoom> {
               : (widget.otherUser['uid'] ?? widget.otherUser['id'].toString());
           
           if (mentorId == currentMentorId && bookingMap['status'] == 'confirmed') {
-            setState(() {
-              bookingData = bookingMap;
-            });
-            print('📅 Booking loaded: ${bookingMap['jam_mulai']} - ${bookingMap['jam_selesai']}');
+            // Load jadwal data to get mata_pelajaran
+            try {
+              final jadwalSnapshot = await _database
+                  .child('jadwal')
+                  .child(mentorId)
+                  .child(bookingMap['jadwal_id'])
+                  .get();
+              
+              if (jadwalSnapshot.exists) {
+                Map<String, dynamic> jadwalMap = Map<String, dynamic>.from(
+                  jadwalSnapshot.value as Map<dynamic, dynamic>
+                );
+                setState(() {
+                  bookingData = bookingMap;
+                  jadwalData = jadwalMap;
+                });
+                print('📅 Booking loaded: ${bookingMap['jam_mulai']} - ${bookingMap['jam_selesai']}');
+                print('📚 Jadwal loaded: ${jadwalMap['mata_pelajaran']}');
+              } else {
+                setState(() {
+                  bookingData = bookingMap;
+                });
+              }
+            } catch (jadwalError) {
+              print('Error loading jadwal: $jadwalError');
+              setState(() {
+                bookingData = bookingMap;
+              });
+            }
             break;
           }
         }
@@ -101,12 +129,17 @@ class _ChatRoomState extends State<ChatRoom> {
         );
         message['id'] = event.snapshot.key;
 
-        setState(() {
-          messages.add(message);
-          messages.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
-        });
+        // Check if message already exists in list (prevent duplicates)
+        bool messageExists = messages.any((m) => m['id'] == message['id']);
+        
+        if (!messageExists) {
+          setState(() {
+            messages.add(message);
+            messages.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
+          });
 
-        _scrollToBottom();
+          _scrollToBottom();
+        }
       }
     });
   }
@@ -245,6 +278,31 @@ class _ChatRoomState extends State<ChatRoom> {
     }
   }
 
+  Future<void> _captureAndSendPhoto() async {
+    if (isUploading) return;
+
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? photo = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (photo != null) {
+        await _uploadAndSendFile(photo, 'image');
+      }
+    } catch (e) {
+      print('Error capturing photo: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengambil foto: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _pickAndSendFile() async {
     if (isUploading) return;
 
@@ -277,6 +335,20 @@ class _ChatRoomState extends State<ChatRoom> {
   }
 
   Future<void> _uploadAndSendFile(dynamic file, String type) async {
+    // Check Firebase Auth first
+    final currentFirebaseUser = FirebaseAuth.instance.currentUser;
+    if (currentFirebaseUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Anda harus login terlebih dahulu untuk mengirim file'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       isUploading = true;
       uploadProgress = 0.0;
@@ -363,8 +435,20 @@ class _ChatRoomState extends State<ChatRoom> {
           isUploading = false;
           uploadProgress = 0.0;
         });
+        
+        String errorMessage = 'Gagal mengirim file';
+        if (e.toString().contains('unauthorized') || e.toString().contains('permission-denied')) {
+          errorMessage = 'Tidak ada izin untuk mengirim file. Silakan restart aplikasi.';
+        } else if (e.toString().contains('network')) {
+          errorMessage = 'Koneksi internet bermasalah';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengirim file: $e')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     }
@@ -524,6 +608,181 @@ class _ChatRoomState extends State<ChatRoom> {
     }
   }
 
+  // Get session status based on booking time
+  String _getSessionStatus() {
+    if (bookingData == null) return 'unknown';
+    
+    try {
+      String tanggal = bookingData!['tanggal'];
+      String jamMulai = bookingData!['jam_mulai'];
+      String jamSelesai = bookingData!['jam_selesai'];
+      
+      // Parse date and times
+      DateTime sessionDate = DateTime.parse(tanggal);
+      List<String> startParts = jamMulai.split(':');
+      List<String> endParts = jamSelesai.split(':');
+      
+      DateTime startTime = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        int.parse(startParts[0]),
+        int.parse(startParts[1]),
+      );
+      
+      DateTime endTime = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        int.parse(endParts[0]),
+        int.parse(endParts[1]),
+      );
+      
+      DateTime now = DateTime.now();
+      
+      if (now.isBefore(startTime)) {
+        return 'booked';
+      } else if (now.isAfter(endTime)) {
+        return 'ended';
+      } else {
+        return 'ongoing';
+      }
+    } catch (e) {
+      print('Error calculating session status: $e');
+      return 'unknown';
+    }
+  }
+
+  // Build session info banner
+  Widget _buildSessionInfoBanner() {
+    String status = _getSessionStatus();
+    String mataPelajaran = jadwalData?['mata_pelajaran'] ?? 'Sesi Mentoring';
+    String tanggal = bookingData!['tanggal'];
+    String jamMulai = bookingData!['jam_mulai'];
+    String jamSelesai = bookingData!['jam_selesai'];
+    
+    // Format date
+    DateTime date = DateTime.parse(tanggal);
+    String formattedDate = DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(date);
+    
+    // Get status info
+    Color statusColor;
+    Color bgColor;
+    String statusText;
+    IconData statusIcon;
+    
+    switch (status) {
+      case 'booked':
+        statusColor = Colors.blue[700]!;
+        bgColor = Colors.blue[50]!;
+        statusText = 'Dijadwalkan';
+        statusIcon = Icons.schedule;
+        break;
+      case 'ongoing':
+        statusColor = Colors.green[700]!;
+        bgColor = Colors.green[50]!;
+        statusText = 'Sedang Berlangsung';
+        statusIcon = Icons.circle;
+        break;
+      case 'ended':
+        statusColor = Colors.grey[700]!;
+        bgColor = Colors.grey[100]!;
+        statusText = 'Selesai';
+        statusIcon = Icons.check_circle;
+        break;
+      default:
+        statusColor = Colors.grey[700]!;
+        bgColor = Colors.grey[100]!;
+        statusText = 'Unknown';
+        statusIcon = Icons.help;
+    }
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.book, size: 18, color: statusColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  mataPelajaran,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: statusColor, width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(statusIcon, size: 14, color: statusColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  formattedDate,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+              const SizedBox(width: 6),
+              Text(
+                '${jamMulai.substring(0, 5)} - ${jamSelesai.substring(0, 5)} WIB',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProfileRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -634,6 +893,9 @@ class _ChatRoomState extends State<ChatRoom> {
       ),
       body: Column(
         children: [
+          // Session Info Banner
+          if (bookingData != null) _buildSessionInfoBanner(),
+          
           // Messages List
           Expanded(
             child: isLoading
@@ -664,9 +926,15 @@ class _ChatRoomState extends State<ChatRoom> {
                         padding: const EdgeInsets.all(16),
                         itemCount: messages.length,
                         itemBuilder: (context, index) {
+                          bool isGrouped = _shouldGroupWithPrevious(index);
+                          bool isLastInGroup = index == messages.length - 1 || 
+                              !_shouldGroupWithPrevious(index + 1);
+                          
                           return _buildMessageBubble(
                             messages[index],
                             currentUserId,
+                            isGrouped: isGrouped,
+                            isLastInGroup: isLastInGroup,
                           );
                         },
                       ),
@@ -704,7 +972,7 @@ class _ChatRoomState extends State<ChatRoom> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Mengirim file... ${(uploadProgress * 100).toInt()}%',
+                            'Mengirim file... ${uploadProgress.isFinite ? (uploadProgress * 100).toInt() : 0}%',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[600],
@@ -731,31 +999,156 @@ class _ChatRoomState extends State<ChatRoom> {
                               : () {
                                   showModalBottomSheet(
                                     context: context,
+                                    backgroundColor: Colors.transparent,
                                     builder: (context) {
-                                      return SafeArea(
-                                        child: Wrap(
-                                          children: [
-                                            ListTile(
-                                              leading: Icon(Icons.image,
-                                                  color: Colors.blue[700]),
-                                              title: const Text(
-                                                  'Gambar dari Galeri'),
-                                              onTap: () {
-                                                Navigator.pop(context);
-                                                _pickAndSendImage();
-                                              },
-                                            ),
-                                            ListTile(
-                                              leading: Icon(
-                                                  Icons.insert_drive_file,
-                                                  color: Colors.blue[700]),
-                                              title: const Text('Dokumen'),
-                                              onTap: () {
-                                                Navigator.pop(context);
-                                                _pickAndSendFile();
-                                              },
-                                            ),
-                                          ],
+                                      return Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.only(
+                                            topLeft: Radius.circular(20),
+                                            topRight: Radius.circular(20),
+                                          ),
+                                        ),
+                                        child: SafeArea(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              // Handle bar
+                                              Container(
+                                                margin: EdgeInsets.only(top: 8, bottom: 8),
+                                                width: 40,
+                                                height: 4,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey[300],
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                                child: Column(
+                                                  children: [
+                                                    // Camera option
+                                                    ListTile(
+                                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(10),
+                                                      ),
+                                                      tileColor: Colors.blue[50],
+                                                      leading: Container(
+                                                        padding: EdgeInsets.all(10),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.blue[700],
+                                                          borderRadius: BorderRadius.circular(8),
+                                                        ),
+                                                        child: Icon(
+                                                          Icons.camera_alt,
+                                                          color: Colors.white,
+                                                          size: 26,
+                                                        ),
+                                                      ),
+                                                      title: Text(
+                                                        'Ambil Foto',
+                                                        style: TextStyle(
+                                                          fontWeight: FontWeight.w600,
+                                                          fontSize: 15,
+                                                        ),
+                                                      ),
+                                                      subtitle: Text(
+                                                        'Gunakan kamera',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors.grey[600],
+                                                        ),
+                                                      ),
+                                                      onTap: () {
+                                                        Navigator.pop(context);
+                                                        _captureAndSendPhoto();
+                                                      },
+                                                    ),
+                                                    SizedBox(height: 6),
+                                                    // Gallery option
+                                                    ListTile(
+                                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(10),
+                                                      ),
+                                                      tileColor: Colors.green[50],
+                                                      leading: Container(
+                                                        padding: EdgeInsets.all(10),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.green[700],
+                                                          borderRadius: BorderRadius.circular(8),
+                                                        ),
+                                                        child: Icon(
+                                                          Icons.photo_library,
+                                                          color: Colors.white,
+                                                          size: 26,
+                                                        ),
+                                                      ),
+                                                      title: Text(
+                                                        'Galeri',
+                                                        style: TextStyle(
+                                                          fontWeight: FontWeight.w600,
+                                                          fontSize: 15,
+                                                        ),
+                                                      ),
+                                                      subtitle: Text(
+                                                        'Pilih dari galeri',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors.grey[600],
+                                                        ),
+                                                      ),
+                                                      onTap: () {
+                                                        Navigator.pop(context);
+                                                        _pickAndSendImage();
+                                                      },
+                                                    ),
+                                                    SizedBox(height: 6),
+                                                    // File option
+                                                    ListTile(
+                                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(10),
+                                                      ),
+                                                      tileColor: Colors.orange[50],
+                                                      leading: Container(
+                                                        padding: EdgeInsets.all(10),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.orange[700],
+                                                          borderRadius: BorderRadius.circular(8),
+                                                        ),
+                                                        child: Icon(
+                                                          Icons.insert_drive_file,
+                                                          color: Colors.white,
+                                                          size: 26,
+                                                        ),
+                                                      ),
+                                                      title: Text(
+                                                        'Dokumen',
+                                                        style: TextStyle(
+                                                          fontWeight: FontWeight.w600,
+                                                          fontSize: 15,
+                                                        ),
+                                                      ),
+                                                      subtitle: Text(
+                                                        'Kirim file dokumen',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors.grey[600],
+                                                        ),
+                                                      ),
+                                                      onTap: () {
+                                                        Navigator.pop(context);
+                                                        _pickAndSendFile();
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              SizedBox(height: 12),
+                                            ],
+                                          ),
                                         ),
                                       );
                                     },
@@ -822,8 +1215,30 @@ class _ChatRoomState extends State<ChatRoom> {
     );
   }
 
+  // Check if this message should be grouped with the previous one
+  bool _shouldGroupWithPrevious(int currentIndex) {
+    if (currentIndex == 0) return false;
+    
+    var currentMessage = messages[currentIndex];
+    var previousMessage = messages[currentIndex - 1];
+    
+    // Same sender
+    bool sameSender = currentMessage['sender_id'] == previousMessage['sender_id'];
+    if (!sameSender) return false;
+    
+    // Within 2 minutes (120000 milliseconds)
+    int timeDiff = (currentMessage['timestamp'] ?? 0) - (previousMessage['timestamp'] ?? 0);
+    bool withinTimeLimit = timeDiff <= 120000; // 2 minutes
+    
+    return withinTimeLimit;
+  }
+
   Widget _buildMessageBubble(
-      Map<String, dynamic> message, String currentUserId) {
+      Map<String, dynamic> message, 
+      String currentUserId, {
+      bool isGrouped = false,
+      bool isLastInGroup = true,
+    }) {
     bool isMe = message['sender_id'] == currentUserId;
 
     // Debug logging
@@ -832,30 +1247,35 @@ class _ChatRoomState extends State<ChatRoom> {
     print('🔗 File URL: ${message['file_url']}');
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(
+        bottom: isLastInGroup ? 12 : 2, // Smaller gap for grouped messages
+      ),
       child: Row(
         mainAxisAlignment:
             isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.blue[100],
-              backgroundImage: widget.otherUser['profile_photo_url'] != null
-                  ? NetworkImage(widget.otherUser['profile_photo_url'])
-                  : null,
-              child: widget.otherUser['profile_photo_url'] == null
-                  ? Text(
-                      widget.otherUser['nama_lengkap'][0].toUpperCase(),
-                      style: TextStyle(
-                        color: Colors.blue[700],
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
-            ),
+            // Show avatar only for first message in group or non-grouped message
+            isGrouped
+                ? const SizedBox(width: 40) // Space for avatar alignment
+                : CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.blue[100],
+                    backgroundImage: widget.otherUser['profile_photo_url'] != null
+                        ? NetworkImage(widget.otherUser['profile_photo_url'])
+                        : null,
+                    child: widget.otherUser['profile_photo_url'] == null
+                        ? Text(
+                            widget.otherUser['nama_lengkap'][0].toUpperCase(),
+                            style: TextStyle(
+                              color: Colors.blue[700],
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
+                  ),
             const SizedBox(width: 8),
           ],
           Flexible(
@@ -959,14 +1379,29 @@ class _ChatRoomState extends State<ChatRoom> {
                       : message['file_type'] == 'file'
                           ? InkWell(
                               onTap: () async {
-                                // Open file in browser
                                 final url = message['file_url'];
-                                if (url != null) {
-                                  if (kIsWeb) {
-                                    // For web, use window.open
-                                    // ignore: avoid_web_libraries_in_flutter
-                                    // You may need to add url_launcher package
-                                    print('Opening file: $url');
+                                if (url != null && url.isNotEmpty) {
+                                  try {
+                                    final uri = Uri.parse(url);
+                                    if (await canLaunchUrl(uri)) {
+                                      await launchUrl(
+                                        uri,
+                                        mode: LaunchMode.externalApplication,
+                                      );
+                                    } else {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Tidak dapat membuka file')),
+                                        );
+                                      }
+                                    }
+                                  } catch (e) {
+                                    print('Error opening file: $e');
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Gagal membuka file: $e')),
+                                      );
+                                    }
                                   }
                                 }
                               },
@@ -1033,14 +1468,17 @@ class _ChatRoomState extends State<ChatRoom> {
                               ),
                             ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  _formatMessageTime(message['timestamp']),
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 11,
+                // Only show timestamp for last message in group
+                if (isLastInGroup) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatMessageTime(message['timestamp']),
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: 11,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

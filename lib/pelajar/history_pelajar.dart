@@ -40,8 +40,6 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
         List<Map<String, dynamic>> tempList = [];
         Map<dynamic, dynamic> bookings = snapshot.value as Map<dynamic, dynamic>;
 
-        final dateFormat = DateFormat('dd/MM/yyyy');
-        final timeFormat = DateFormat('HH:mm');
         DateTime now = DateTime.now();
 
         for (var entry in bookings.entries) {
@@ -50,41 +48,51 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
 
           try {
             // Parse booking date and time
-            DateTime bookingDate = dateFormat.parse(booking['tanggal']);
-            DateTime bookingTime = timeFormat.parse(booking['jam_selesai']);
+            // Date format in database is yyyy-MM-dd (e.g., 2026-01-02)
+            DateTime bookingDate = DateTime.parse(booking['tanggal']);
             
+            // Parse jam_selesai (HH:mm format)
+            List<String> timeParts = booking['jam_selesai'].toString().split(':');
             DateTime sessionEndTime = DateTime(
               bookingDate.year,
               bookingDate.month,
               bookingDate.day,
-              bookingTime.hour,
-              bookingTime.minute,
+              int.parse(timeParts[0]),
+              int.parse(timeParts[1]),
             );
 
-            // Only show completed or past sessions
-            if (booking['status'] == 'completed' || sessionEndTime.isBefore(now)) {
-              // If session is past but status not updated, update it
-              if (sessionEndTime.isBefore(now) && booking['status'] != 'completed') {
-                await _database
-                    .child('bookings')
-                    .child(entry.key)
-                    .update({'status': 'completed'});
-                booking['status'] = 'completed';
-              }
-              
+            // Show all bookings (confirmed, completed, or past sessions)
+            bool shouldShow = false;
+            
+            if (booking['status'] == 'completed') {
+              shouldShow = true;
+            } else if (booking['status'] == 'confirmed' && sessionEndTime.isBefore(now)) {
+              // Auto-update past confirmed sessions to completed
+              await _database
+                  .child('bookings')
+                  .child(entry.key)
+                  .update({'status': 'completed'});
+              booking['status'] = 'completed';
+              shouldShow = true;
+            } else if (booking['status'] == 'confirmed') {
+              // Also show upcoming confirmed bookings
+              shouldShow = true;
+            }
+            
+            if (shouldShow) {
               tempList.add(booking);
-              print('✅ Added to history: ${booking['mentor_name']} - ${booking['tanggal']}');
+              print('✅ Added to history: ${booking['mentor_name']} - ${booking['tanggal']} (${booking['status']})');
             }
           } catch (e) {
-            print('❌ Error parsing date for booking: $e');
+            print('❌ Error parsing date for booking ${entry.key}: $e');
           }
         }
 
         // Sort by date descending (newest first)
         tempList.sort((a, b) {
           try {
-            DateTime dateA = dateFormat.parse(a['tanggal']);
-            DateTime dateB = dateFormat.parse(b['tanggal']);
+            DateTime dateA = DateTime.parse(a['tanggal']);
+            DateTime dateB = DateTime.parse(b['tanggal']);
             return dateB.compareTo(dateA);
           } catch (e) {
             return 0;
@@ -129,6 +137,26 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Gagal mengirim review")),
       );
+    }
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      // Parse yyyy-MM-dd format
+      final date = DateTime.parse(dateStr);
+      // Format to readable Indonesian date
+      return DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(date);
+    } catch (e) {
+      return dateStr; // Return original if parsing fails
+    }
+  }
+
+  String _formatCurrency(dynamic value) {
+    try {
+      double amount = double.parse(value.toString());
+      return NumberFormat('#,###', 'id_ID').format(amount);
+    } catch (e) {
+      return value.toString();
     }
   }
 
@@ -314,18 +342,27 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
                                 Icon(Icons.calendar_today,
                                     size: 16, color: Colors.grey[600]),
                                 const SizedBox(width: 5),
-                                Text(
-                                  "${booking['tanggal']} • ${booking['jam_mulai']} - ${booking['jam_selesai']}",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
+                                Expanded(
+                                  child: Text(
+                                    "${_formatDate(booking['tanggal'])} • ${booking['jam_mulai']} - ${booking['jam_selesai']}",
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                    ),
                                   ),
                                 ),
-                                const Spacer(),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(Icons.attach_money,
+                                    size: 16, color: Colors.grey[600]),
+                                const SizedBox(width: 5),
                                 Text(
                                   "Rp ${_formatCurrency(booking['harga'] ?? 0)}",
                                   style: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.blue[700],
                                   ),
@@ -392,14 +429,5 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
                   },
                 ),
     );
-  }
-
-  String _formatCurrency(dynamic value) {
-    if (value == null) return "0";
-    double amount = double.parse(value.toString());
-    return amount.toStringAsFixed(0).replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]}.',
-        );
   }
 }

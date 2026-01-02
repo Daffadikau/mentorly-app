@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -9,7 +7,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
-import '../common/api_config.dart';
 
 class ProfileMentor extends StatefulWidget {
   final Map<String, dynamic> mentorData;
@@ -111,67 +108,89 @@ class _ProfileMentorState extends State<ProfileMentor> {
       isLoading = true;
     });
 
-    String uri = ApiConfig.getUrl('update_profile_mentor.php');
-
-    var body = {
-      "itemid": widget.mentorData['id'].toString(),
-      "itemnama": _namaController.text.trim(),
-      "itememail": _emailController.text.trim(),
-      "itemkeahlianutama": _keahlianUtamaController.text.trim(),
-      "itemkeahlianlain": _keahlianLainController.text.trim(),
-      "itemlinkedin": _linkedinController.text.trim(),
-      "itemdeskripsi": _deskripsiController.text.trim(),
-    };
-
-    if (_passwordController.text.isNotEmpty) {
-      body["itempassword"] = _passwordController.text;
-    }
-
     try {
-      var response = await http
-          .post(
-            Uri.parse(uri),
-            body: body,
-          )
-          .timeout(const Duration(seconds: 10));
+      // Get current user ID
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? 
+                   widget.mentorData['uid'] ?? 
+                   widget.mentorData['id'].toString();
 
-      if (response.statusCode == 200) {
-        var data = jsonDecode(response.body);
-        if (data['status'] == 'success') {
-          // Update local data
-          widget.mentorData['nama_lengkap'] = _namaController.text.trim();
-          widget.mentorData['email'] = _emailController.text.trim();
-          widget.mentorData['keahlian_utama'] =
-              _keahlianUtamaController.text.trim();
-          widget.mentorData['keahlian_lain'] =
-              _keahlianLainController.text.trim();
-          widget.mentorData['linkedin_url'] = _linkedinController.text.trim();
-          widget.mentorData['deskripsi'] = _deskripsiController.text.trim();
+      if (uid == null) {
+        _showError("User ID tidak ditemukan");
+        setState(() => isLoading = false);
+        return;
+      }
 
-          // Update session
-          await SessionManager.saveSession(
-            userType: 'mentor',
-            userData: widget.mentorData,
-          );
+      print("🔄 Updating mentor profile for UID: $uid");
 
+      // Prepare update data
+      Map<String, dynamic> updateData = {
+        'nama_lengkap': _namaController.text.trim(),
+        'email': _emailController.text.trim(),
+        'keahlian_utama': _keahlianUtamaController.text.trim(),
+        'keahlian_lain': _keahlianLainController.text.trim(),
+        'linkedin_url': _linkedinController.text.trim(),
+        'deskripsi': _deskripsiController.text.trim(),
+      };
+
+      // Update Firebase RTDB
+      await FirebaseDatabase.instance
+          .ref('mentors')
+          .child(uid)
+          .update(updateData);
+
+      // Update password if provided
+      if (_passwordController.text.isNotEmpty) {
+        try {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            await user.updatePassword(_passwordController.text);
+            print("✅ Password updated successfully");
+          }
+        } catch (e) {
+          print("⚠️ Password update failed: $e");
+          // Don't fail the whole update if password change fails
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Profil berhasil diupdate"),
-                backgroundColor: Colors.green,
+              SnackBar(
+                content: Text("Profil diupdate tapi gagal ubah password: $e"),
+                backgroundColor: Colors.orange,
               ),
             );
-            setState(() {
-              isEditing = false;
-              _passwordController.clear();
-            });
           }
-        } else {
-          _showError(data['message'] ?? "Update gagal");
         }
       }
+
+      // Update local data
+      widget.mentorData['nama_lengkap'] = _namaController.text.trim();
+      widget.mentorData['email'] = _emailController.text.trim();
+      widget.mentorData['keahlian_utama'] = _keahlianUtamaController.text.trim();
+      widget.mentorData['keahlian_lain'] = _keahlianLainController.text.trim();
+      widget.mentorData['linkedin_url'] = _linkedinController.text.trim();
+      widget.mentorData['deskripsi'] = _deskripsiController.text.trim();
+
+      // Update session
+      await SessionManager.saveSession(
+        userType: 'mentor',
+        userData: widget.mentorData,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Profil berhasil diupdate"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        setState(() {
+          isEditing = false;
+          _passwordController.clear();
+        });
+      }
+
+      print("✅ Profile updated successfully");
     } catch (e) {
-      _showError("Koneksi gagal. Periksa internet Anda.");
+      print("❌ Error updating profile: $e");
+      _showError("Gagal update profil: $e");
     } finally {
       if (mounted) {
         setState(() {
