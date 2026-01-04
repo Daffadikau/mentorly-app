@@ -80,7 +80,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     print('   - Channel: ${widget.channelName}');
     print('   - Video: ${widget.isVideoCall}');
     print('   - User: ${widget.currentUserId}');
-    
+
     // Request permissions
     if (widget.isVideoCall) {
       await [Permission.microphone, Permission.camera].request();
@@ -91,14 +91,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     // Create RTC engine
     _engine = createAgoraRtcEngine();
     await _engine.initialize(const RtcEngineContext(
-      appId: '6ac6f6dc56b941d19e409d96ca518d5f', // TODO: Replace with your Agora App ID
+      appId:
+          '6ac6f6dc56b941d19e409d96ca518d5f', // TODO: Replace with your Agora App ID
       channelProfile: ChannelProfileType.channelProfileCommunication,
     ));
 
     _engine.registerEventHandler(
       RtcEngineEventHandler(
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-          print('✅ Local user ${connection.localUid} joined channel ${connection.channelId}');
+          print(
+              '✅ Local user ${connection.localUid} joined channel ${connection.channelId}');
           setState(() {
             _localUserJoined = true;
           });
@@ -156,15 +158,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       final parts = widget.bookingEndTime!.split(':');
       final endHour = int.parse(parts[0]);
       final endMinute = int.parse(parts[1]);
-      
+
       // Check every 5 seconds if current time >= end time
       _bookingTimeChecker = Timer.periodic(const Duration(seconds: 5), (timer) {
         final now = DateTime.now();
         final currentMinutes = now.hour * 60 + now.minute;
         final endMinutes = endHour * 60 + endMinute;
-        
-        print('🕒 Time check: ${now.hour}:${now.minute} vs end ${endHour}:${endMinute}');
-        
+
+        print(
+            '🕒 Time check: ${now.hour}:${now.minute} vs end ${endHour}:${endMinute}');
+
         // End call if current time >= booking end time
         if (currentMinutes >= endMinutes && !_isTimeExpired) {
           print('⏰ Booking time expired! Auto-ending call...');
@@ -172,7 +175,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           _showTimeExpiredDialog();
         }
       });
-      
+
       print('📅 Booking end time set to: ${widget.bookingEndTime}');
     } catch (e) {
       print('❌ Error parsing booking end time: $e');
@@ -267,7 +270,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       try {
         // Disable camera first
         await _engine.enableLocalVideo(false);
-        
+
         // Start screen capture
         await _engine.startScreenCapture(
           const ScreenCaptureParameters2(
@@ -275,12 +278,12 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             captureVideo: true,
           ),
         );
-        
+
         setState(() {
           _isSharingScreen = true;
         });
         print('📱 Screen sharing started');
-        
+
         // Show notification
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -425,13 +428,19 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    _isSharingScreen 
-                        ? 'Sharing Screen' 
-                        : widget.isVideoCall ? 'Video Call' : 'Voice Call',
+                    _isSharingScreen
+                        ? 'Sharing Screen'
+                        : widget.isVideoCall
+                            ? 'Video Call'
+                            : 'Voice Call',
                     style: TextStyle(
-                      color: _isSharingScreen ? Colors.green : Colors.white.withOpacity(0.7),
+                      color: _isSharingScreen
+                          ? Colors.green
+                          : Colors.white.withOpacity(0.7),
                       fontSize: 14,
-                      fontWeight: _isSharingScreen ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: _isSharingScreen
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ],
@@ -480,7 +489,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   // Screen share button (video call only)
                   if (widget.isVideoCall)
                     _buildControlButton(
-                      icon: _isSharingScreen ? Icons.stop_screen_share : Icons.screen_share,
+                      icon: _isSharingScreen
+                          ? Icons.stop_screen_share
+                          : Icons.screen_share,
                       onTap: _toggleScreenShare,
                       backgroundColor: _isSharingScreen
                           ? Colors.green

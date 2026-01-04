@@ -30,7 +30,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
     });
 
     try {
-      final mentorId = widget.mentorData['uid'] ?? widget.mentorData['id'].toString();
+      final mentorId =
+          widget.mentorData['uid'] ?? widget.mentorData['id'].toString();
       print('🔍 Loading riwayat for mentor: $mentorId');
 
       // Get all bookings for this mentor
@@ -53,7 +54,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
           try {
             // Parse booking date and time
             DateTime bookingDate = DateTime.parse(booking['tanggal']);
-            List<String> timeParts = booking['jam_selesai'].toString().split(':');
+            List<String> timeParts =
+                booking['jam_selesai'].toString().split(':');
             DateTime sessionEndTime = DateTime(
               bookingDate.year,
               bookingDate.month,
@@ -64,10 +66,11 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
 
             // Show completed or past sessions
             bool shouldShow = false;
-            
+
             if (booking['status'] == 'completed') {
               shouldShow = true;
-            } else if (booking['status'] == 'confirmed' && sessionEndTime.isBefore(now)) {
+            } else if (booking['status'] == 'confirmed' &&
+                sessionEndTime.isBefore(now)) {
               // Auto-update past confirmed sessions to completed
               await _database
                   .child('bookings')
@@ -76,10 +79,11 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
               booking['status'] = 'completed';
               shouldShow = true;
             }
-            
+
             if (shouldShow) {
               tempList.add(booking);
-              print('✅ Added to riwayat: ${booking['pelajar_name']} - ${booking['tanggal']} (${booking['status']})');
+              print(
+                  '✅ Added to riwayat: ${booking['pelajar_name']} - ${booking['tanggal']} (${booking['status']})');
               print('   📋 Booking data keys: ${booking.keys.toList()}');
               print('   👤 pelajar_id: ${booking['pelajar_id']}');
             }
@@ -226,7 +230,9 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
           gradient: LinearGradient(
             colors: [
               Colors.white,
-              isCompleted ? Colors.green[50]!.withOpacity(0.3) : Colors.grey[50]!.withOpacity(0.3),
+              isCompleted
+                  ? Colors.green[50]!.withOpacity(0.3)
+                  : Colors.grey[50]!.withOpacity(0.3),
             ],
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
@@ -279,7 +285,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(tanggal),
+                          DateFormat('EEEE, dd MMMM yyyy', 'id_ID')
+                              .format(tanggal),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -288,7 +295,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                            Icon(Icons.access_time,
+                                size: 14, color: Colors.grey[600]),
                             const SizedBox(width: 4),
                             Text(
                               "${riwayat['jam_mulai']} - ${riwayat['jam_selesai']}",
@@ -303,7 +311,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: isCompleted
@@ -313,7 +322,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: (isCompleted ? Colors.green : Colors.grey).withOpacity(0.3),
+                          color: (isCompleted ? Colors.green : Colors.grey)
+                              .withOpacity(0.3),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -390,7 +400,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                     ),
                     if (riwayat['harga'] != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.green[50],
                           borderRadius: BorderRadius.circular(8),
@@ -409,7 +420,9 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                 ),
               ],
               // Display review if exists
-              if (riwayat['rating'] != null && int.tryParse(riwayat['rating'].toString()) != null && int.parse(riwayat['rating'].toString()) > 0) ...[
+              if (riwayat['rating'] != null &&
+                  int.tryParse(riwayat['rating'].toString()) != null &&
+                  int.parse(riwayat['rating'].toString()) > 0) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -427,7 +440,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.star_rounded, size: 18, color: Colors.amber[700]),
+                          Icon(Icons.star_rounded,
+                              size: 18, color: Colors.amber[700]),
                           const SizedBox(width: 6),
                           Text(
                             "Review dari Pelajar",
@@ -451,7 +465,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                           );
                         }),
                       ),
-                      if (riwayat['review'] != null && riwayat['review'].toString().isNotEmpty) ...[
+                      if (riwayat['review'] != null &&
+                          riwayat['review'].toString().isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Text(
                           riwayat['review'],
@@ -466,7 +481,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                   ),
                 ),
               ],
-              if (riwayat['catatan'] != null && riwayat['catatan'].toString().isNotEmpty) ...[
+              if (riwayat['catatan'] != null &&
+                  riwayat['catatan'].toString().isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -478,7 +494,8 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.note_rounded, size: 16, color: Colors.amber[800]),
+                      Icon(Icons.note_rounded,
+                          size: 16, color: Colors.amber[800]),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -519,9 +536,9 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
       print('⚠️ Student ID is null or empty');
       return '';
     }
-    
+
     print('📸 Trying to load photo for student: $studentId');
-    
+
     try {
       // Get photo URL from database instead of constructing path
       final snapshot = await _database
@@ -529,7 +546,7 @@ class _RiwayatMengajarState extends State<RiwayatMengajar> {
           .child(studentId)
           .child('profile_photo_url')
           .get();
-      
+
       if (snapshot.exists && snapshot.value != null) {
         final url = snapshot.value.toString();
         print('✅ Photo URL found from database: $url');

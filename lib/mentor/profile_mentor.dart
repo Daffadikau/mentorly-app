@@ -110,9 +110,9 @@ class _ProfileMentorState extends State<ProfileMentor> {
 
     try {
       // Get current user ID
-      final uid = FirebaseAuth.instance.currentUser?.uid ?? 
-                   widget.mentorData['uid'] ?? 
-                   widget.mentorData['id'].toString();
+      final uid = FirebaseAuth.instance.currentUser?.uid ??
+          widget.mentorData['uid'] ??
+          widget.mentorData['id'].toString();
 
       if (uid == null) {
         _showError("User ID tidak ditemukan");
@@ -163,7 +163,8 @@ class _ProfileMentorState extends State<ProfileMentor> {
       // Update local data
       widget.mentorData['nama_lengkap'] = _namaController.text.trim();
       widget.mentorData['email'] = _emailController.text.trim();
-      widget.mentorData['keahlian_utama'] = _keahlianUtamaController.text.trim();
+      widget.mentorData['keahlian_utama'] =
+          _keahlianUtamaController.text.trim();
       widget.mentorData['keahlian_lain'] = _keahlianLainController.text.trim();
       widget.mentorData['linkedin_url'] = _linkedinController.text.trim();
       widget.mentorData['deskripsi'] = _deskripsiController.text.trim();

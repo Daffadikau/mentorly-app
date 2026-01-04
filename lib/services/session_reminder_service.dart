@@ -99,13 +99,16 @@ class SessionReminderService {
 
           // Send 5-minute reminder (with cache check)
           String cacheKey5 = '${bookingId}_5min';
-          if (!reminded5Min && difference.inMinutes <= 5 && difference.inMinutes > 0 && 
+          if (!reminded5Min &&
+              difference.inMinutes <= 5 &&
+              difference.inMinutes > 0 &&
               !_notificationCache.containsKey(cacheKey5)) {
             print('⏰ Sending 5-minute reminder');
             _notificationCache[cacheKey5] = now;
             await NotificationService.showSessionNotification(
               title: '⏰ Sesi akan dimulai dalam ${difference.inMinutes} menit!',
-              body: '${booking['mentor_name']} - ${booking['tanggal']} jam ${booking['jam_mulai']}',
+              body:
+                  '${booking['mentor_name']} - ${booking['tanggal']} jam ${booking['jam_mulai']}',
               payload: 'session_reminder_$bookingId',
             );
 
@@ -118,13 +121,16 @@ class SessionReminderService {
 
           // Send session start notification (with cache check)
           String cacheKeyStart = '${bookingId}_start';
-          if (!remindedStart && difference.inMinutes <= 0 && difference.inMinutes > -5 &&
+          if (!remindedStart &&
+              difference.inMinutes <= 0 &&
+              difference.inMinutes > -5 &&
               !_notificationCache.containsKey(cacheKeyStart)) {
             print('🎓 Sending session start notification');
             _notificationCache[cacheKeyStart] = now;
             await NotificationService.showSessionNotification(
               title: '🎓 Sesi dimulai sekarang!',
-              body: '${booking['mentor_name']} - ${booking['tanggal']} jam ${booking['jam_mulai']}',
+              body:
+                  '${booking['mentor_name']} - ${booking['tanggal']} jam ${booking['jam_mulai']}',
               payload: 'session_start_$bookingId',
             );
 
@@ -134,7 +140,6 @@ class SessionReminderService {
                 .child(bookingId)
                 .update({'reminded_start': true});
           }
-
         } catch (e) {
           print('❌ Error parsing booking date/time: $e');
         }

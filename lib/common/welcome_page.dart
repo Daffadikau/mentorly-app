@@ -12,9 +12,9 @@ class WelcomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     // Precache logo to prevent freeze
     precacheImage(const AssetImage('assets/images/logodoang.png'), context);
-    
+
     return Scaffold(
-      backgroundColor: Colors.blue[700],
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -23,17 +23,11 @@ class WelcomePage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(40),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Image.asset(
-                      'assets/images/logodoang.png',
-                      width: 100,
-                      height: 100,
-                    ),
+                  Image.asset(
+                    'assets/images/logodoang.png',
+                    width: 320,
+                    height: 320,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 30),
                   const Text(
@@ -42,14 +36,14 @@ class WelcomePage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 15),
-                  const Text(
+                  Text(
                     "Siapa untuk naik level?\nDaftar Mentorly sekarang!",
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, color: Colors.white70),
+                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
                   ),
                   const SizedBox(height: 40),
                   _buildRoleButton(
@@ -58,7 +52,8 @@ class WelcomePage extends StatelessWidget {
                     Icons.person,
                     () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const LoginPage()),
+                      MaterialPageRoute(
+                          builder: (context) => const LoginPage()),
                     ),
                   ),
                   const SizedBox(height: 15),
@@ -79,7 +74,8 @@ class WelcomePage extends StatelessWidget {
                     Icons.admin_panel_settings,
                     () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const LoginAdmin()),
+                      MaterialPageRoute(
+                          builder: (context) => const LoginAdmin()),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -90,10 +86,10 @@ class WelcomePage extends StatelessWidget {
                       MaterialPageRoute(
                           builder: (context) => const DebugAccountManager()),
                     ),
-                    icon: const Icon(Icons.bug_report, color: Colors.white70),
-                    label: const Text(
+                    icon: Icon(Icons.bug_report, color: Colors.grey[600]),
+                    label: Text(
                       '🔧 Test Account Manager',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                   ),
                   // Restore button - Emergency use only
@@ -103,10 +99,10 @@ class WelcomePage extends StatelessWidget {
                       MaterialPageRoute(
                           builder: (context) => const FirebaseRestoreUtility()),
                     ),
-                    icon: Icon(Icons.restore, color: Colors.red[200]),
-                    label: const Text(
+                    icon: Icon(Icons.restore, color: Colors.red[400]),
+                    label: Text(
                       '🚨 Firebase Restore',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                   ),
                   const SizedBox(height: 20),

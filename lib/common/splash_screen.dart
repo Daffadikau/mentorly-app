@@ -38,10 +38,10 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkLoginStatus() async {
     try {
       print('🔍 Checking login status...');
-      
+
       // Initialize notifications in background
       _initializeNotifications();
-      
+
       await Future.delayed(const Duration(seconds: 3));
 
       bool isLoggedIn = await SessionManager.isLoggedIn();
@@ -87,12 +87,12 @@ class _SplashScreenState extends State<SplashScreen> {
     } catch (e, stackTrace) {
       print('❌ Error in splash screen: $e');
       print('❌ Stack trace: $stackTrace');
-      
+
       // Show error and navigate to onboarding
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
-      
+
       await Future.delayed(const Duration(seconds: 2));
       Navigator.pushReplacement(
         context,

@@ -52,9 +52,12 @@ class _ChatListPageState extends State<ChatListPage> {
 
           // Debug: print room details
           print('\n🔍 Checking room: ${entry.key}');
-          print('   - pelajar_id: ${room['pelajar_id']} (${room['pelajar_id'].runtimeType})');
-          print('   - mentor_id: ${room['mentor_id']} (${room['mentor_id'].runtimeType})');
-          print('   - Current user: $userId (${userId.runtimeType}) (${widget.userType})');
+          print(
+              '   - pelajar_id: ${room['pelajar_id']} (${room['pelajar_id'].runtimeType})');
+          print(
+              '   - mentor_id: ${room['mentor_id']} (${room['mentor_id'].runtimeType})');
+          print(
+              '   - Current user: $userId (${userId.runtimeType}) (${widget.userType})');
 
           // Check if this room belongs to current user - convert all to string for comparison
           String roomPelajarId = (room['pelajar_id'] ?? '').toString();
@@ -64,10 +67,12 @@ class _ChatListPageState extends State<ChatListPage> {
           bool isUserRoom = false;
           if (widget.userType == 'pelajar') {
             isUserRoom = (roomPelajarId == currentUserId);
-            print('   - Pelajar check: "$roomPelajarId" == "$currentUserId" ? $isUserRoom');
+            print(
+                '   - Pelajar check: "$roomPelajarId" == "$currentUserId" ? $isUserRoom');
           } else if (widget.userType == 'mentor') {
             isUserRoom = (roomMentorId == currentUserId);
-            print('   - Mentor check: "$roomMentorId" == "$currentUserId" ? $isUserRoom');
+            print(
+                '   - Mentor check: "$roomMentorId" == "$currentUserId" ? $isUserRoom');
           }
 
           if (!isUserRoom) {
@@ -80,15 +85,13 @@ class _ChatListPageState extends State<ChatListPage> {
 
           // Load last message - get all messages and find the latest one
           try {
-            final lastMsgSnapshot = await _database
-                .child('messages')
-                .child(entry.key)
-                .get();
+            final lastMsgSnapshot =
+                await _database.child('messages').child(entry.key).get();
 
             if (lastMsgSnapshot.exists && lastMsgSnapshot.value != null) {
               Map<dynamic, dynamic> messages =
                   lastMsgSnapshot.value as Map<dynamic, dynamic>;
-              
+
               if (messages.isNotEmpty) {
                 // Find message with highest timestamp
                 var lastMsg = messages.values.reduce((a, b) {
@@ -96,9 +99,10 @@ class _ChatListPageState extends State<ChatListPage> {
                   int timestampB = b['timestamp'] ?? 0;
                   return timestampA > timestampB ? a : b;
                 });
-                
+
                 room['last_message'] = lastMsg['message'] ?? 'Chat dimulai';
-                room['last_message_time'] = lastMsg['timestamp'] ?? room['created_at'];
+                room['last_message_time'] =
+                    lastMsg['timestamp'] ?? room['created_at'];
                 room['last_sender_id'] = lastMsg['sender_id'];
               } else {
                 // Messages empty
@@ -150,37 +154,42 @@ class _ChatListPageState extends State<ChatListPage> {
           try {
             final bookingSnapshot = await _database
                 .child('bookings')
-                .orderByChild(widget.userType == 'mentor' ? 'mentor_id' : 'pelajar_id')
+                .orderByChild(
+                    widget.userType == 'mentor' ? 'mentor_id' : 'pelajar_id')
                 .equalTo(currentUserId)
                 .get();
 
             if (bookingSnapshot.exists) {
-              Map<dynamic, dynamic> bookings = bookingSnapshot.value as Map<dynamic, dynamic>;
+              Map<dynamic, dynamic> bookings =
+                  bookingSnapshot.value as Map<dynamic, dynamic>;
               // Find booking between current user and other user
               for (var bookingEntry in bookings.entries) {
                 var booking = bookingEntry.value;
-                String bookingOtherUserId = widget.userType == 'mentor' 
+                String bookingOtherUserId = widget.userType == 'mentor'
                     ? booking['pelajar_id'].toString()
                     : booking['mentor_id'].toString();
-                
+
                 if (bookingOtherUserId == otherUserId) {
                   // Load jadwal info to get mata_pelajaran
                   String jadwalId = booking['jadwal_id'].toString();
                   String jadwalMentorId = booking['mentor_id'].toString();
-                  
+
                   final jadwalSnapshot = await _database
                       .child('jadwal')
                       .child(jadwalMentorId)
                       .child(jadwalId)
                       .get();
-                  
+
                   if (jadwalSnapshot.exists) {
-                    var jadwalData = jadwalSnapshot.value as Map<dynamic, dynamic>;
-                    room['mata_pelajaran'] = jadwalData['mata_pelajaran'] ?? 'Sesi Mentoring';
+                    var jadwalData =
+                        jadwalSnapshot.value as Map<dynamic, dynamic>;
+                    room['mata_pelajaran'] =
+                        jadwalData['mata_pelajaran'] ?? 'Sesi Mentoring';
                     room['tanggal'] = booking['tanggal'] ?? '';
                     room['jam_mulai'] = booking['jam_mulai'] ?? '';
                     room['jam_selesai'] = booking['jam_selesai'] ?? '';
-                    print('📚 Loaded mata pelajaran: ${room['mata_pelajaran']}');
+                    print(
+                        '📚 Loaded mata pelajaran: ${room['mata_pelajaran']}');
                   }
                   break; // Use first matching booking
                 }
@@ -331,7 +340,7 @@ class _ChatListPageState extends State<ChatListPage> {
                 ),
               );
             }
-            
+
             if (snapshot.hasData && snapshot.data!.isNotEmpty) {
               return CachedCircleAvatar(
                 imageUrl: snapshot.data!,
@@ -339,7 +348,7 @@ class _ChatListPageState extends State<ChatListPage> {
                 fallbackIcon: Icons.person,
               );
             }
-            
+
             // Fallback to first letter
             return CircleAvatar(
               radius: 28,
@@ -368,7 +377,8 @@ class _ChatListPageState extends State<ChatListPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Show mata pelajaran for mentor to differentiate students
-              if (widget.userType == 'mentor' && chatRoom['mata_pelajaran'] != null)
+              if (widget.userType == 'mentor' &&
+                  chatRoom['mata_pelajaran'] != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(

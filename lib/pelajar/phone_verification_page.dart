@@ -80,14 +80,15 @@ class _PhoneVerificationPageState extends State<PhoneVerificationPage> {
 
       // Verify phone credential (tanpa sign in)
       print('📱 Verifying phone credential...');
-      
+
       // Just verify the code is correct by trying to sign in temporarily
-      final tempAuth = await FirebaseAuth.instance.signInWithCredential(credential);
+      final tempAuth =
+          await FirebaseAuth.instance.signInWithCredential(credential);
       print('✅ Phone verified successfully!');
-      
+
       // Sign out immediately - we don't want phone auth session
       await FirebaseAuth.instance.signOut();
-      
+
       // Return success - will create email/password account in register page
       if (mounted) {
         Navigator.pop(context, {
@@ -97,10 +98,9 @@ class _PhoneVerificationPageState extends State<PhoneVerificationPage> {
           'phoneUid': tempAuth.user?.uid, // Save this for reference
         });
       }
-
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'Verifikasi gagal';
-      
+
       if (e.code == 'invalid-verification-code') {
         errorMessage = 'Kode verifikasi salah';
       } else if (e.code == 'session-expired') {
@@ -182,7 +182,8 @@ class _PhoneVerificationPageState extends State<PhoneVerificationPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.blue[700],
-        title: const Text('Verifikasi Nomor Telepon', style: TextStyle(color: Colors.white)),
+        title: const Text('Verifikasi Nomor Telepon',
+            style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -267,7 +268,9 @@ class _PhoneVerificationPageState extends State<PhoneVerificationPage> {
                   TextButton(
                     onPressed: _canResend && !_isVerifying ? _resendCode : null,
                     child: Text(
-                      _canResend ? "Kirim Ulang" : "Kirim ulang dalam $_resendCountdown detik",
+                      _canResend
+                          ? "Kirim Ulang"
+                          : "Kirim ulang dalam $_resendCountdown detik",
                       style: TextStyle(
                         color: _canResend ? Colors.blue[700] : Colors.grey,
                         fontWeight: FontWeight.bold,

@@ -26,7 +26,8 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
     setState(() => isLoading = true);
 
     try {
-      final pelajarId = widget.pelajarData['uid'] ?? widget.pelajarData['id'].toString();
+      final pelajarId =
+          widget.pelajarData['uid'] ?? widget.pelajarData['id'].toString();
       print('🔍 Loading history for pelajar: $pelajarId');
 
       // Get all bookings for this pelajar
@@ -38,7 +39,8 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
 
       if (snapshot.exists) {
         List<Map<String, dynamic>> tempList = [];
-        Map<dynamic, dynamic> bookings = snapshot.value as Map<dynamic, dynamic>;
+        Map<dynamic, dynamic> bookings =
+            snapshot.value as Map<dynamic, dynamic>;
 
         DateTime now = DateTime.now();
 
@@ -50,9 +52,10 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
             // Parse booking date and time
             // Date format in database is yyyy-MM-dd (e.g., 2026-01-02)
             DateTime bookingDate = DateTime.parse(booking['tanggal']);
-            
+
             // Parse jam_selesai (HH:mm format)
-            List<String> timeParts = booking['jam_selesai'].toString().split(':');
+            List<String> timeParts =
+                booking['jam_selesai'].toString().split(':');
             DateTime sessionEndTime = DateTime(
               bookingDate.year,
               bookingDate.month,
@@ -63,10 +66,11 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
 
             // Show all bookings (confirmed, completed, or past sessions)
             bool shouldShow = false;
-            
+
             if (booking['status'] == 'completed') {
               shouldShow = true;
-            } else if (booking['status'] == 'confirmed' && sessionEndTime.isBefore(now)) {
+            } else if (booking['status'] == 'confirmed' &&
+                sessionEndTime.isBefore(now)) {
               // Auto-update past confirmed sessions to completed
               await _database
                   .child('bookings')
@@ -78,10 +82,11 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
               // Also show upcoming confirmed bookings
               shouldShow = true;
             }
-            
+
             if (shouldShow) {
               tempList.add(booking);
-              print('✅ Added to history: ${booking['mentor_name']} - ${booking['tanggal']} (${booking['status']})');
+              print(
+                  '✅ Added to history: ${booking['mentor_name']} - ${booking['tanggal']} (${booking['status']})');
             }
           } catch (e) {
             print('❌ Error parsing date for booking ${entry.key}: $e');
@@ -173,7 +178,8 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
           builder: (context, setDialogState) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("Rating:", style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text("Rating:",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

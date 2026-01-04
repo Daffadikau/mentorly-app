@@ -12,11 +12,11 @@ class TambahKelasMentor extends StatefulWidget {
 
 class _TambahKelasMentorState extends State<TambahKelasMentor> {
   final TextEditingController _courseNameController = TextEditingController();
-  
+
   String? selectedCategory;
   String? selectedClass;
   String? selectedDuration;
-  
+
   bool isLoading = false;
 
   // Data untuk dropdown
@@ -162,7 +162,8 @@ class _TambahKelasMentorState extends State<TambahKelasMentor> {
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          icon:
+                              const Icon(Icons.arrow_back, color: Colors.white),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -241,7 +242,8 @@ class _TambahKelasMentorState extends State<TambahKelasMentor> {
                     controller: _courseNameController,
                     decoration: InputDecoration(
                       hintText: 'contoh: bagaimana tumbuhan berfotosintesis',
-                      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                      hintStyle:
+                          TextStyle(color: Colors.grey[400], fontSize: 14),
                       filled: true,
                       fillColor: Colors.grey[100],
                       border: OutlineInputBorder(

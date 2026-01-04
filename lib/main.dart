@@ -16,27 +16,27 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
-    
+
     print('🚀 Starting Mentorly App...');
-    
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     print('✅ Firebase initialized');
-    
+
     // Setup background message handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     print('✅ Background message handler set');
-    
+
     await initializeDateFormatting('id_ID', null);
     print('✅ Date formatting initialized');
-    
+
     runApp(const MentorlyApp());
     print('✅ App running');
   } catch (e, stackTrace) {
     print('❌ Error in main: $e');
     print('❌ Stack trace: $stackTrace');
-    
+
     // Show error screen
     runApp(MaterialApp(
       home: Scaffold(

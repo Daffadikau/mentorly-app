@@ -63,22 +63,26 @@ class _ChatRoomState extends State<ChatRoom> {
       final snapshot = await _database
           .child('bookings')
           .orderByChild('pelajar_id')
-          .equalTo(widget.userType == 'pelajar' 
-              ? (widget.currentUser['uid'] ?? widget.currentUser['id'].toString())
+          .equalTo(widget.userType == 'pelajar'
+              ? (widget.currentUser['uid'] ??
+                  widget.currentUser['id'].toString())
               : (widget.otherUser['uid'] ?? widget.otherUser['id'].toString()))
           .get();
 
       if (snapshot.exists) {
-        Map<dynamic, dynamic> bookings = snapshot.value as Map<dynamic, dynamic>;
+        Map<dynamic, dynamic> bookings =
+            snapshot.value as Map<dynamic, dynamic>;
         for (var booking in bookings.values) {
           Map<String, dynamic> bookingMap = Map<String, dynamic>.from(booking);
           // Find booking for this chat room
           String mentorId = bookingMap['mentor_id'] ?? '';
           String currentMentorId = widget.userType == 'mentor'
-              ? (widget.currentUser['uid'] ?? widget.currentUser['id'].toString())
+              ? (widget.currentUser['uid'] ??
+                  widget.currentUser['id'].toString())
               : (widget.otherUser['uid'] ?? widget.otherUser['id'].toString());
-          
-          if (mentorId == currentMentorId && bookingMap['status'] == 'confirmed') {
+
+          if (mentorId == currentMentorId &&
+              bookingMap['status'] == 'confirmed') {
             // Load jadwal data to get mata_pelajaran
             try {
               final jadwalSnapshot = await _database
@@ -86,16 +90,16 @@ class _ChatRoomState extends State<ChatRoom> {
                   .child(mentorId)
                   .child(bookingMap['jadwal_id'])
                   .get();
-              
+
               if (jadwalSnapshot.exists) {
                 Map<String, dynamic> jadwalMap = Map<String, dynamic>.from(
-                  jadwalSnapshot.value as Map<dynamic, dynamic>
-                );
+                    jadwalSnapshot.value as Map<dynamic, dynamic>);
                 setState(() {
                   bookingData = bookingMap;
                   jadwalData = jadwalMap;
                 });
-                print('📅 Booking loaded: ${bookingMap['jam_mulai']} - ${bookingMap['jam_selesai']}');
+                print(
+                    '📅 Booking loaded: ${bookingMap['jam_mulai']} - ${bookingMap['jam_selesai']}');
                 print('📚 Jadwal loaded: ${jadwalMap['mata_pelajaran']}');
               } else {
                 setState(() {
@@ -131,7 +135,7 @@ class _ChatRoomState extends State<ChatRoom> {
 
         // Check if message already exists in list (prevent duplicates)
         bool messageExists = messages.any((m) => m['id'] == message['id']);
-        
+
         if (!messageExists) {
           setState(() {
             messages.add(message);
@@ -215,9 +219,10 @@ class _ChatRoomState extends State<ChatRoom> {
 
       // Send notification to recipient
       try {
-        String recipientId = widget.otherUser['uid'] ?? widget.otherUser['id'].toString();
+        String recipientId =
+            widget.otherUser['uid'] ?? widget.otherUser['id'].toString();
         String senderName = widget.currentUser['nama_lengkap'] ?? 'User';
-        
+
         await NotificationService.sendChatNotification(
           recipientId: recipientId,
           senderName: senderName,
@@ -341,7 +346,8 @@ class _ChatRoomState extends State<ChatRoom> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Anda harus login terlebih dahulu untuk mengirim file'),
+            content:
+                Text('Anda harus login terlebih dahulu untuk mengirim file'),
             backgroundColor: Colors.red,
           ),
         );
@@ -435,14 +441,16 @@ class _ChatRoomState extends State<ChatRoom> {
           isUploading = false;
           uploadProgress = 0.0;
         });
-        
+
         String errorMessage = 'Gagal mengirim file';
-        if (e.toString().contains('unauthorized') || e.toString().contains('permission-denied')) {
-          errorMessage = 'Tidak ada izin untuk mengirim file. Silakan restart aplikasi.';
+        if (e.toString().contains('unauthorized') ||
+            e.toString().contains('permission-denied')) {
+          errorMessage =
+              'Tidak ada izin untuk mengirim file. Silakan restart aplikasi.';
         } else if (e.toString().contains('network')) {
           errorMessage = 'Koneksi internet bermasalah';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -482,9 +490,9 @@ class _ChatRoomState extends State<ChatRoom> {
 
       if (snapshot.exists) {
         final pelajarData = Map<String, dynamic>.from(snapshot.value as Map);
-        
+
         if (!mounted) return;
-        
+
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -503,7 +511,8 @@ class _ChatRoomState extends State<ChatRoom> {
                           : null,
                       child: pelajarData['profile_photo_url'] == null
                           ? Text(
-                              (pelajarData['nama_lengkap'] ?? 'P')[0].toUpperCase(),
+                              (pelajarData['nama_lengkap'] ?? 'P')[0]
+                                  .toUpperCase(),
                               style: const TextStyle(
                                 fontSize: 40,
                                 color: Colors.white,
@@ -514,9 +523,12 @@ class _ChatRoomState extends State<ChatRoom> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _buildProfileRow(Icons.person, 'Nama', pelajarData['nama_lengkap'] ?? '-'),
-                  _buildProfileRow(Icons.email, 'Email', pelajarData['email'] ?? '-'),
-                  _buildProfileRow(Icons.phone, 'Telepon', pelajarData['phone'] ?? '-'),
+                  _buildProfileRow(
+                      Icons.person, 'Nama', pelajarData['nama_lengkap'] ?? '-'),
+                  _buildProfileRow(
+                      Icons.email, 'Email', pelajarData['email'] ?? '-'),
+                  _buildProfileRow(
+                      Icons.phone, 'Telepon', pelajarData['phone'] ?? '-'),
                 ],
               ),
             ),
@@ -549,9 +561,9 @@ class _ChatRoomState extends State<ChatRoom> {
 
       if (snapshot.exists) {
         final mentorData = Map<String, dynamic>.from(snapshot.value as Map);
-        
+
         if (!mounted) return;
-        
+
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -570,7 +582,8 @@ class _ChatRoomState extends State<ChatRoom> {
                           : null,
                       child: mentorData['profile_photo_url'] == null
                           ? Text(
-                              (mentorData['nama_lengkap'] ?? 'M')[0].toUpperCase(),
+                              (mentorData['nama_lengkap'] ?? 'M')[0]
+                                  .toUpperCase(),
                               style: const TextStyle(
                                 fontSize: 40,
                                 color: Colors.white,
@@ -581,11 +594,16 @@ class _ChatRoomState extends State<ChatRoom> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _buildProfileRow(Icons.person, 'Nama', mentorData['nama_lengkap'] ?? '-'),
-                  _buildProfileRow(Icons.email, 'Email', mentorData['email'] ?? '-'),
-                  _buildProfileRow(Icons.phone, 'Telepon', mentorData['phone'] ?? '-'),
-                  _buildProfileRow(Icons.school, 'Bidang Keahlian', mentorData['bidang_keahlian'] ?? '-'),
-                  _buildProfileRow(Icons.work, 'Pengalaman', '${mentorData['pengalaman'] ?? '-'} tahun'),
+                  _buildProfileRow(
+                      Icons.person, 'Nama', mentorData['nama_lengkap'] ?? '-'),
+                  _buildProfileRow(
+                      Icons.email, 'Email', mentorData['email'] ?? '-'),
+                  _buildProfileRow(
+                      Icons.phone, 'Telepon', mentorData['phone'] ?? '-'),
+                  _buildProfileRow(Icons.school, 'Bidang Keahlian',
+                      mentorData['bidang_keahlian'] ?? '-'),
+                  _buildProfileRow(Icons.work, 'Pengalaman',
+                      '${mentorData['pengalaman'] ?? '-'} tahun'),
                 ],
               ),
             ),
@@ -611,17 +629,17 @@ class _ChatRoomState extends State<ChatRoom> {
   // Get session status based on booking time
   String _getSessionStatus() {
     if (bookingData == null) return 'unknown';
-    
+
     try {
       String tanggal = bookingData!['tanggal'];
       String jamMulai = bookingData!['jam_mulai'];
       String jamSelesai = bookingData!['jam_selesai'];
-      
+
       // Parse date and times
       DateTime sessionDate = DateTime.parse(tanggal);
       List<String> startParts = jamMulai.split(':');
       List<String> endParts = jamSelesai.split(':');
-      
+
       DateTime startTime = DateTime(
         sessionDate.year,
         sessionDate.month,
@@ -629,7 +647,7 @@ class _ChatRoomState extends State<ChatRoom> {
         int.parse(startParts[0]),
         int.parse(startParts[1]),
       );
-      
+
       DateTime endTime = DateTime(
         sessionDate.year,
         sessionDate.month,
@@ -637,9 +655,9 @@ class _ChatRoomState extends State<ChatRoom> {
         int.parse(endParts[0]),
         int.parse(endParts[1]),
       );
-      
+
       DateTime now = DateTime.now();
-      
+
       if (now.isBefore(startTime)) {
         return 'booked';
       } else if (now.isAfter(endTime)) {
@@ -660,17 +678,18 @@ class _ChatRoomState extends State<ChatRoom> {
     String tanggal = bookingData!['tanggal'];
     String jamMulai = bookingData!['jam_mulai'];
     String jamSelesai = bookingData!['jam_selesai'];
-    
+
     // Format date
     DateTime date = DateTime.parse(tanggal);
-    String formattedDate = DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(date);
-    
+    String formattedDate =
+        DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(date);
+
     // Get status info
     Color statusColor;
     Color bgColor;
     String statusText;
     IconData statusIcon;
-    
+
     switch (status) {
       case 'booked':
         statusColor = Colors.blue[700]!;
@@ -696,7 +715,7 @@ class _ChatRoomState extends State<ChatRoom> {
         statusText = 'Unknown';
         statusIcon = Icons.help;
     }
-    
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -724,7 +743,8 @@ class _ChatRoomState extends State<ChatRoom> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
@@ -895,7 +915,7 @@ class _ChatRoomState extends State<ChatRoom> {
         children: [
           // Session Info Banner
           if (bookingData != null) _buildSessionInfoBanner(),
-          
+
           // Messages List
           Expanded(
             child: isLoading
@@ -927,9 +947,9 @@ class _ChatRoomState extends State<ChatRoom> {
                         itemCount: messages.length,
                         itemBuilder: (context, index) {
                           bool isGrouped = _shouldGroupWithPrevious(index);
-                          bool isLastInGroup = index == messages.length - 1 || 
+                          bool isLastInGroup = index == messages.length - 1 ||
                               !_shouldGroupWithPrevious(index + 1);
-                          
+
                           return _buildMessageBubble(
                             messages[index],
                             currentUserId,
@@ -1015,30 +1035,46 @@ class _ChatRoomState extends State<ChatRoom> {
                                             children: [
                                               // Handle bar
                                               Container(
-                                                margin: EdgeInsets.only(top: 8, bottom: 8),
+                                                margin: EdgeInsets.only(
+                                                    top: 8, bottom: 8),
                                                 width: 40,
                                                 height: 4,
                                                 decoration: BoxDecoration(
                                                   color: Colors.grey[300],
-                                                  borderRadius: BorderRadius.circular(2),
+                                                  borderRadius:
+                                                      BorderRadius.circular(2),
                                                 ),
                                               ),
                                               Padding(
-                                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 16),
                                                 child: Column(
                                                   children: [
                                                     // Camera option
                                                     ListTile(
-                                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(10),
+                                                      contentPadding:
+                                                          EdgeInsets.symmetric(
+                                                              horizontal: 12,
+                                                              vertical: 6),
+                                                      shape:
+                                                          RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10),
                                                       ),
-                                                      tileColor: Colors.blue[50],
+                                                      tileColor:
+                                                          Colors.blue[50],
                                                       leading: Container(
-                                                        padding: EdgeInsets.all(10),
-                                                        decoration: BoxDecoration(
-                                                          color: Colors.blue[700],
-                                                          borderRadius: BorderRadius.circular(8),
+                                                        padding:
+                                                            EdgeInsets.all(10),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color:
+                                                              Colors.blue[700],
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
                                                         ),
                                                         child: Icon(
                                                           Icons.camera_alt,
@@ -1049,7 +1085,8 @@ class _ChatRoomState extends State<ChatRoom> {
                                                       title: Text(
                                                         'Ambil Foto',
                                                         style: TextStyle(
-                                                          fontWeight: FontWeight.w600,
+                                                          fontWeight:
+                                                              FontWeight.w600,
                                                           fontSize: 15,
                                                         ),
                                                       ),
@@ -1057,7 +1094,8 @@ class _ChatRoomState extends State<ChatRoom> {
                                                         'Gunakan kamera',
                                                         style: TextStyle(
                                                           fontSize: 12,
-                                                          color: Colors.grey[600],
+                                                          color:
+                                                              Colors.grey[600],
                                                         ),
                                                       ),
                                                       onTap: () {
@@ -1068,16 +1106,28 @@ class _ChatRoomState extends State<ChatRoom> {
                                                     SizedBox(height: 6),
                                                     // Gallery option
                                                     ListTile(
-                                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(10),
+                                                      contentPadding:
+                                                          EdgeInsets.symmetric(
+                                                              horizontal: 12,
+                                                              vertical: 6),
+                                                      shape:
+                                                          RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10),
                                                       ),
-                                                      tileColor: Colors.green[50],
+                                                      tileColor:
+                                                          Colors.green[50],
                                                       leading: Container(
-                                                        padding: EdgeInsets.all(10),
-                                                        decoration: BoxDecoration(
-                                                          color: Colors.green[700],
-                                                          borderRadius: BorderRadius.circular(8),
+                                                        padding:
+                                                            EdgeInsets.all(10),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color:
+                                                              Colors.green[700],
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
                                                         ),
                                                         child: Icon(
                                                           Icons.photo_library,
@@ -1088,7 +1138,8 @@ class _ChatRoomState extends State<ChatRoom> {
                                                       title: Text(
                                                         'Galeri',
                                                         style: TextStyle(
-                                                          fontWeight: FontWeight.w600,
+                                                          fontWeight:
+                                                              FontWeight.w600,
                                                           fontSize: 15,
                                                         ),
                                                       ),
@@ -1096,7 +1147,8 @@ class _ChatRoomState extends State<ChatRoom> {
                                                         'Pilih dari galeri',
                                                         style: TextStyle(
                                                           fontSize: 12,
-                                                          color: Colors.grey[600],
+                                                          color:
+                                                              Colors.grey[600],
                                                         ),
                                                       ),
                                                       onTap: () {
@@ -1107,19 +1159,32 @@ class _ChatRoomState extends State<ChatRoom> {
                                                     SizedBox(height: 6),
                                                     // File option
                                                     ListTile(
-                                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(10),
+                                                      contentPadding:
+                                                          EdgeInsets.symmetric(
+                                                              horizontal: 12,
+                                                              vertical: 6),
+                                                      shape:
+                                                          RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10),
                                                       ),
-                                                      tileColor: Colors.orange[50],
+                                                      tileColor:
+                                                          Colors.orange[50],
                                                       leading: Container(
-                                                        padding: EdgeInsets.all(10),
-                                                        decoration: BoxDecoration(
-                                                          color: Colors.orange[700],
-                                                          borderRadius: BorderRadius.circular(8),
+                                                        padding:
+                                                            EdgeInsets.all(10),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: Colors
+                                                              .orange[700],
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
                                                         ),
                                                         child: Icon(
-                                                          Icons.insert_drive_file,
+                                                          Icons
+                                                              .insert_drive_file,
                                                           color: Colors.white,
                                                           size: 26,
                                                         ),
@@ -1127,7 +1192,8 @@ class _ChatRoomState extends State<ChatRoom> {
                                                       title: Text(
                                                         'Dokumen',
                                                         style: TextStyle(
-                                                          fontWeight: FontWeight.w600,
+                                                          fontWeight:
+                                                              FontWeight.w600,
                                                           fontSize: 15,
                                                         ),
                                                       ),
@@ -1135,7 +1201,8 @@ class _ChatRoomState extends State<ChatRoom> {
                                                         'Kirim file dokumen',
                                                         style: TextStyle(
                                                           fontSize: 12,
-                                                          color: Colors.grey[600],
+                                                          color:
+                                                              Colors.grey[600],
                                                         ),
                                                       ),
                                                       onTap: () {
@@ -1218,27 +1285,29 @@ class _ChatRoomState extends State<ChatRoom> {
   // Check if this message should be grouped with the previous one
   bool _shouldGroupWithPrevious(int currentIndex) {
     if (currentIndex == 0) return false;
-    
+
     var currentMessage = messages[currentIndex];
     var previousMessage = messages[currentIndex - 1];
-    
+
     // Same sender
-    bool sameSender = currentMessage['sender_id'] == previousMessage['sender_id'];
+    bool sameSender =
+        currentMessage['sender_id'] == previousMessage['sender_id'];
     if (!sameSender) return false;
-    
+
     // Within 2 minutes (120000 milliseconds)
-    int timeDiff = (currentMessage['timestamp'] ?? 0) - (previousMessage['timestamp'] ?? 0);
+    int timeDiff = (currentMessage['timestamp'] ?? 0) -
+        (previousMessage['timestamp'] ?? 0);
     bool withinTimeLimit = timeDiff <= 120000; // 2 minutes
-    
+
     return withinTimeLimit;
   }
 
   Widget _buildMessageBubble(
-      Map<String, dynamic> message, 
-      String currentUserId, {
-      bool isGrouped = false,
-      bool isLastInGroup = true,
-    }) {
+    Map<String, dynamic> message,
+    String currentUserId, {
+    bool isGrouped = false,
+    bool isLastInGroup = true,
+  }) {
     bool isMe = message['sender_id'] == currentUserId;
 
     // Debug logging
@@ -1262,7 +1331,8 @@ class _ChatRoomState extends State<ChatRoom> {
                 : CircleAvatar(
                     radius: 16,
                     backgroundColor: Colors.blue[100],
-                    backgroundImage: widget.otherUser['profile_photo_url'] != null
+                    backgroundImage: widget.otherUser['profile_photo_url'] !=
+                            null
                         ? NetworkImage(widget.otherUser['profile_photo_url'])
                         : null,
                     child: widget.otherUser['profile_photo_url'] == null
@@ -1390,16 +1460,22 @@ class _ChatRoomState extends State<ChatRoom> {
                                       );
                                     } else {
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Tidak dapat membuka file')),
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                              content: Text(
+                                                  'Tidak dapat membuka file')),
                                         );
                                       }
                                     }
                                   } catch (e) {
                                     print('Error opening file: $e');
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Gagal membuka file: $e')),
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                            content:
+                                                Text('Gagal membuka file: $e')),
                                       );
                                     }
                                   }
@@ -1490,13 +1566,11 @@ class _ChatRoomState extends State<ChatRoom> {
   // Listen for incoming calls
   void _listenToIncomingCalls() {
     // Both mentor and pelajar can receive calls
-    String currentUserId = widget.currentUser['uid'] ?? widget.currentUser['id'].toString();
-    
-    _callSubscription = _database
-        .child('calls')
-        .child(widget.roomId)
-        .onValue
-        .listen((event) {
+    String currentUserId =
+        widget.currentUser['uid'] ?? widget.currentUser['id'].toString();
+
+    _callSubscription =
+        _database.child('calls').child(widget.roomId).onValue.listen((event) {
       if (event.snapshot.value != null) {
         Map<String, dynamic> callData = Map<String, dynamic>.from(
           event.snapshot.value as Map<dynamic, dynamic>,
@@ -1505,7 +1579,8 @@ class _ChatRoomState extends State<ChatRoom> {
         String callState = callData['state'] ?? '';
         String callerId = callData['caller_id'] ?? '';
 
-        print('📞 Call state changed: $callState, caller: $callerId, me: $currentUserId');
+        print(
+            '📞 Call state changed: $callState, caller: $callerId, me: $currentUserId');
 
         // Only show dialog for incoming calls (not my own calls)
         if (callState == 'pending' && callerId != currentUserId) {
@@ -1553,7 +1628,8 @@ class _ChatRoomState extends State<ChatRoom> {
           builder: (context) => VideoCallScreen(
             channelName: callData['channel_id'] ?? '',
             token: '', // Empty token for Agora (will work for testing)
-            currentUserId: widget.currentUser['uid'] ?? widget.currentUser['id'].toString(),
+            currentUserId: widget.currentUser['uid'] ??
+                widget.currentUser['id'].toString(),
             currentUserName: widget.currentUser['nama_lengkap'] ?? 'User',
             otherUserName: widget.otherUser['nama_lengkap'] ?? 'User',
             isVideoCall: callData['is_video'] ?? true,
@@ -1582,8 +1658,10 @@ class _ChatRoomState extends State<ChatRoom> {
   Future<void> _startCall(bool isVideoCall) async {
     try {
       // Generate channel ID
-      String channelId = 'call_${widget.roomId}_${DateTime.now().millisecondsSinceEpoch}';
-      String currentUserId = widget.currentUser['uid'] ?? widget.currentUser['id'].toString();
+      String channelId =
+          'call_${widget.roomId}_${DateTime.now().millisecondsSinceEpoch}';
+      String currentUserId =
+          widget.currentUser['uid'] ?? widget.currentUser['id'].toString();
 
       // Create call in Firebase
       await _database.child('calls').child(widget.roomId).set({
@@ -1596,9 +1674,10 @@ class _ChatRoomState extends State<ChatRoom> {
 
       // Send call notification to recipient
       try {
-        String recipientId = widget.otherUser['uid'] ?? widget.otherUser['id'].toString();
+        String recipientId =
+            widget.otherUser['uid'] ?? widget.otherUser['id'].toString();
         String callerName = widget.currentUser['nama_lengkap'] ?? 'User';
-        
+
         await NotificationService.sendCallNotification(
           recipientId: recipientId,
           callerName: callerName,
@@ -1619,7 +1698,8 @@ class _ChatRoomState extends State<ChatRoom> {
           builder: (context) => VideoCallScreen(
             channelName: channelId,
             token: '', // Empty token for Agora (will work for testing)
-            currentUserId: widget.currentUser['uid'] ?? widget.currentUser['id'].toString(),
+            currentUserId: widget.currentUser['uid'] ??
+                widget.currentUser['id'].toString(),
             currentUserName: widget.currentUser['nama_lengkap'] ?? 'User',
             otherUserName: widget.otherUser['nama_lengkap'] ?? 'User',
             isVideoCall: isVideoCall,
@@ -1682,8 +1762,7 @@ class _ChatRoomState extends State<ChatRoom> {
                           child: Center(
                             child: CircularProgressIndicator(
                               color: Colors.white,
-                              value: loadingProgress.expectedTotalBytes !=
-                                      null
+                              value: loadingProgress.expectedTotalBytes != null
                                   ? loadingProgress.cumulativeBytesLoaded /
                                       loadingProgress.expectedTotalBytes!
                                   : null,
@@ -1708,7 +1787,8 @@ class _ChatRoomState extends State<ChatRoom> {
                         color: Colors.black54,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
+                      child: const Icon(Icons.close,
+                          color: Colors.white, size: 24),
                     ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),

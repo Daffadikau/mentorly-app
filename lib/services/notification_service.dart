@@ -6,11 +6,12 @@ import 'package:intl/intl.dart';
 import 'dart:io' show Platform;
 
 class NotificationService {
-  static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  static final FlutterLocalNotificationsPlugin _localNotifications = 
+  static final FirebaseMessaging _firebaseMessaging =
+      FirebaseMessaging.instance;
+  static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   static final DatabaseReference _database = FirebaseDatabase.instance.ref();
-  
+
   static String? _fcmToken;
   static BuildContext? _context;
 
@@ -18,9 +19,10 @@ class NotificationService {
   static Future<void> initialize(BuildContext context) async {
     try {
       _context = context;
-      
+
       // Request permission
-      NotificationSettings settings = await _firebaseMessaging.requestPermission(
+      NotificationSettings settings =
+          await _firebaseMessaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
@@ -29,7 +31,7 @@ class NotificationService {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         print('✅ Notification permission granted');
-        
+
         // For iOS, get APNS token first
         if (Platform.isIOS) {
           String? apnsToken = await _firebaseMessaging.getAPNSToken();
@@ -45,7 +47,7 @@ class NotificationService {
             }
           }
         }
-        
+
         // Get FCM token
         try {
           _fcmToken = await _firebaseMessaging.getToken();
@@ -54,13 +56,12 @@ class NotificationService {
           print('⚠️ Error getting FCM token: $e');
           // Continue without FCM token
         }
-        
+
         // Initialize local notifications
         await _initializeLocalNotifications();
-        
+
         // Setup message handlers
         _setupMessageHandlers();
-        
       } else {
         print('❌ Notification permission denied');
       }
@@ -72,10 +73,10 @@ class NotificationService {
 
   // Initialize local notifications
   static Future<void> _initializeLocalNotifications() async {
-    const AndroidInitializationSettings androidSettings = 
+    const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    const DarwinInitializationSettings iosSettings = 
+
+    const DarwinInitializationSettings iosSettings =
         DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -111,7 +112,8 @@ class NotificationService {
       playSound: true,
     );
 
-    const AndroidNotificationChannel bookingChannel = AndroidNotificationChannel(
+    const AndroidNotificationChannel bookingChannel =
+        AndroidNotificationChannel(
       'booking_channel',
       'Booking Notifications',
       description: 'Notifications for new bookings',
@@ -121,19 +123,23 @@ class NotificationService {
     );
 
     await _localNotifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(chatChannel);
-    
+
     await _localNotifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(callChannel);
-    
+
     await _localNotifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(bookingChannel);
 
     // Create session reminder channel
-    const AndroidNotificationChannel sessionChannel = AndroidNotificationChannel(
+    const AndroidNotificationChannel sessionChannel =
+        AndroidNotificationChannel(
       'session_channel',
       'Session Reminders',
       description: 'Notifications for upcoming sessions',
@@ -143,7 +149,8 @@ class NotificationService {
     );
 
     await _localNotifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(sessionChannel);
   }
 
@@ -162,7 +169,9 @@ class NotificationService {
     });
 
     // Handle message when app is opened from terminated state
-    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+    FirebaseMessaging.instance
+        .getInitialMessage()
+        .then((RemoteMessage? message) {
       if (message != null) {
         print('🚀 App opened from terminated state: ${message.data}');
         _handleNotificationTap(message.data);
@@ -181,8 +190,11 @@ class NotificationService {
 
     AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       channelId,
-      channelId == 'chat_channel' ? 'Chat Notifications' : 
-      channelId == 'call_channel' ? 'Call Notifications' : 'Booking Notifications',
+      channelId == 'chat_channel'
+          ? 'Chat Notifications'
+          : channelId == 'call_channel'
+              ? 'Call Notifications'
+              : 'Booking Notifications',
       channelDescription: message.notification?.body ?? '',
       importance: Importance.high,
       priority: Priority.high,
@@ -225,7 +237,7 @@ class NotificationService {
   // Handle notification tap with data
   static void _handleNotificationTap(Map<String, dynamic> data) {
     String type = data['type'] ?? '';
-    
+
     if (_context == null) return;
 
     if (type == 'chat') {
@@ -248,10 +260,7 @@ class NotificationService {
     if (_fcmToken == null) return;
 
     try {
-      await _database
-          .child('fcm_tokens')
-          .child(userId)
-          .set({
+      await _database.child('fcm_tokens').child(userId).set({
         'token': _fcmToken,
         'user_type': userType,
         'updated_at': DateTime.now().millisecondsSinceEpoch,
@@ -273,15 +282,14 @@ class NotificationService {
     try {
       // Get user's FCM token
       final snapshot = await _database.child('fcm_tokens').child(userId).get();
-      
+
       if (!snapshot.exists) {
         print('⚠️ No FCM token found for user: $userId');
         return;
       }
 
-      Map<String, dynamic> tokenData = Map<String, dynamic>.from(
-        snapshot.value as Map<dynamic, dynamic>
-      );
+      Map<String, dynamic> tokenData =
+          Map<String, dynamic>.from(snapshot.value as Map<dynamic, dynamic>);
       String token = tokenData['token'] ?? '';
 
       if (token.isEmpty) return;
@@ -340,7 +348,9 @@ class NotificationService {
   }) async {
     await sendNotificationToUser(
       userId: recipientId,
-      title: isVideo ? '📹 Video Call dari $callerName' : '📞 Voice Call dari $callerName',
+      title: isVideo
+          ? '📹 Video Call dari $callerName'
+          : '📞 Voice Call dari $callerName',
       body: 'Ketuk untuk menjawab',
       type: 'call',
       data: {
@@ -389,10 +399,10 @@ class NotificationService {
       // Parse date and time
       final dateFormat = DateFormat('dd/MM/yyyy');
       final timeFormat = DateFormat('HH:mm');
-      
+
       DateTime sessionDate = dateFormat.parse(tanggal);
       DateTime sessionTime = timeFormat.parse(jamMulai);
-      
+
       // Combine date and time
       DateTime sessionDateTime = DateTime(
         sessionDate.year,
@@ -403,7 +413,8 @@ class NotificationService {
       );
 
       // Calculate notification times
-      DateTime fiveMinutesBefore = sessionDateTime.subtract(const Duration(minutes: 5));
+      DateTime fiveMinutesBefore =
+          sessionDateTime.subtract(const Duration(minutes: 5));
       DateTime sessionStart = sessionDateTime;
 
       // Get current time
@@ -435,7 +446,6 @@ class NotificationService {
         );
         print('✅ Session start notification scheduled');
       }
-
     } catch (e) {
       print('❌ Error scheduling session reminders: $e');
     }
@@ -449,7 +459,8 @@ class NotificationService {
     required DateTime scheduledTime,
     required String payload,
   }) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
       'session_channel',
       'Session Reminders',
       channelDescription: 'Notifications for upcoming sessions',
@@ -474,7 +485,7 @@ class NotificationService {
     );
 
     // For immediate or past notifications, show them now
-    if (scheduledTime.isBefore(DateTime.now()) || 
+    if (scheduledTime.isBefore(DateTime.now()) ||
         scheduledTime.difference(DateTime.now()).inSeconds < 5) {
       await _localNotifications.show(
         id,
@@ -503,7 +514,8 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
       'session_channel',
       'Session Reminders',
       channelDescription: 'Notifications for upcoming sessions',

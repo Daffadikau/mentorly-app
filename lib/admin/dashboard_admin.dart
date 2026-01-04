@@ -237,7 +237,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 24),
+              child: const Icon(Icons.admin_panel_settings,
+                  color: Colors.white, size: 24),
             ),
             const SizedBox(width: 12),
             const Text(
@@ -332,7 +333,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                     ],
                   ),
                 ),
-                
+
                 // Stats Section
                 Padding(
                   padding: const EdgeInsets.all(20),
@@ -341,7 +342,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.bar_chart, color: Colors.blue[700], size: 24),
+                          Icon(Icons.bar_chart,
+                              color: Colors.blue[700], size: 24),
                           const SizedBox(width: 8),
                           const Text(
                             "Statistik Platform",
@@ -388,11 +390,12 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                         ],
                       ),
                       const SizedBox(height: 30),
-                      
+
                       // Quick Actions Panel
                       Row(
                         children: [
-                          Icon(Icons.flash_on_rounded, color: Colors.amber[700], size: 24),
+                          Icon(Icons.flash_on_rounded,
+                              color: Colors.amber[700], size: 24),
                           const SizedBox(width: 8),
                           const Text(
                             "Aksi Cepat",
@@ -436,11 +439,12 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                         ],
                       ),
                       const SizedBox(height: 30),
-                      
+
                       // Chart Section
                       Row(
                         children: [
-                          Icon(Icons.pie_chart_rounded, color: Colors.purple[700], size: 24),
+                          Icon(Icons.pie_chart_rounded,
+                              color: Colors.purple[700], size: 24),
                           const SizedBox(width: 8),
                           const Text(
                             "Distribusi Status",
@@ -454,7 +458,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                       const SizedBox(height: 15),
                       _buildStatusChart(),
                       const SizedBox(height: 30),
-                      
+
                       // Tab Section
                       Row(
                         children: [
@@ -467,11 +471,15 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                               },
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
                                 decoration: BoxDecoration(
                                   gradient: !showVerified
                                       ? LinearGradient(
-                                          colors: [Colors.orange[600]!, Colors.orange[400]!],
+                                          colors: [
+                                            Colors.orange[600]!,
+                                            Colors.orange[400]!
+                                          ],
                                         )
                                       : null,
                                   color: showVerified ? Colors.white : null,
@@ -483,7 +491,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                                   boxShadow: !showVerified
                                       ? [
                                           BoxShadow(
-                                            color: Colors.orange.withOpacity(0.3),
+                                            color:
+                                                Colors.orange.withOpacity(0.3),
                                             blurRadius: 8,
                                             offset: const Offset(0, 4),
                                           ),
@@ -528,11 +537,15 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                               },
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
                                 decoration: BoxDecoration(
                                   gradient: showVerified
                                       ? LinearGradient(
-                                          colors: [Colors.green[600]!, Colors.green[400]!],
+                                          colors: [
+                                            Colors.green[600]!,
+                                            Colors.green[400]!
+                                          ],
                                         )
                                       : null,
                                   color: !showVerified ? Colors.white : null,
@@ -544,7 +557,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                                   boxShadow: showVerified
                                       ? [
                                           BoxShadow(
-                                            color: Colors.green.withOpacity(0.3),
+                                            color:
+                                                Colors.green.withOpacity(0.3),
                                             blurRadius: 8,
                                             offset: const Offset(0, 4),
                                           ),
@@ -844,7 +858,9 @@ class _DashboardAdminState extends State<DashboardAdmin> {
             gradient: LinearGradient(
               colors: [
                 Colors.white,
-                isPending ? Colors.orange[50]!.withOpacity(0.3) : Colors.green[50]!.withOpacity(0.3),
+                isPending
+                    ? Colors.orange[50]!.withOpacity(0.3)
+                    : Colors.green[50]!.withOpacity(0.3),
               ],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
@@ -896,7 +912,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          Icon(Icons.email_rounded, size: 14, color: Colors.grey[600]),
+                          Icon(Icons.email_rounded,
+                              size: 14, color: Colors.grey[600]),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
@@ -913,7 +930,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                       ),
                       const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.blue[50],
                           borderRadius: BorderRadius.circular(20),
@@ -925,7 +943,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.school_rounded, size: 12, color: Colors.blue[700]),
+                            Icon(Icons.school_rounded,
+                                size: 12, color: Colors.blue[700]),
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
@@ -971,12 +990,17 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                             }
                             final isVerified = snapshot.data ?? false;
                             return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: isVerified ? Colors.green[50] : Colors.orange[50],
+                                color: isVerified
+                                    ? Colors.green[50]
+                                    : Colors.orange[50],
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: isVerified ? Colors.green[200]! : Colors.orange[200]!,
+                                  color: isVerified
+                                      ? Colors.green[200]!
+                                      : Colors.orange[200]!,
                                   width: 1,
                                 ),
                               ),
@@ -1017,7 +1041,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                 Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: isPending
@@ -1027,7 +1052,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: (isPending ? Colors.orange : Colors.green).withOpacity(0.3),
+                            color: (isPending ? Colors.orange : Colors.green)
+                                .withOpacity(0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -1065,8 +1091,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     );
   }
 
-  Widget _buildQuickActionCard(
-      String label, String count, IconData icon, MaterialColor color, VoidCallback onTap) {
+  Widget _buildQuickActionCard(String label, String count, IconData icon,
+      MaterialColor color, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -1135,7 +1161,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     int pending = mentorPending.length;
     int verified = mentorVerified.length;
     int total = pending + verified;
-    
+
     if (total == 0) {
       return Container(
         height: 200,

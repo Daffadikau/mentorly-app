@@ -28,10 +28,13 @@ class _DashboardMentorState extends State<DashboardMentor> {
   late Map<String, dynamic> currentMentorData;
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   bool _isFabExpanded = false;
+  late PageController _pageController;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: 0);
     currentMentorData = widget.mentorData;
     isActive = currentMentorData['is_active'] == '1';
     loadJadwal();
@@ -50,6 +53,12 @@ class _DashboardMentorState extends State<DashboardMentor> {
       });
       _loadLatestMentorData();
     }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLatestMentorData() async {
@@ -313,9 +322,126 @@ class _DashboardMentorState extends State<DashboardMentor> {
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        children: [
+          // Halaman 0: Beranda
+          _buildBerandaPage(context, totalSessions, availableSlots, earnings, rating),
+          // Halaman 1: Transaksi
+          TransactionMentor(mentorData: currentMentorData),
+          // Halaman 2: Chat
+          ChatListPage(
+            userData: currentMentorData,
+            userType: 'mentor',
+          ),
+          // Halaman 3: Profil
+          ProfileMentor(mentorData: currentMentorData),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.blue[700],
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          if (_selectedIndex != index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+            _pageController.animateToPage(
+              index,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_wallet), label: 'Transaksi'),
+          BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
+        ],
+      ),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_isFabExpanded) ...[
+            // Lihat Kelas Button
+            FloatingActionButton.extended(
+              heroTag: 'lihat_kelas',
+              onPressed: () {
+                setState(() => _isFabExpanded = false);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        DaftarKelasMentor(mentorData: currentMentorData),
+                  ),
+                );
+              },
+              backgroundColor: Colors.white,
+              icon: const Icon(Icons.list, color: Color(0xFF5B6BC4)),
+              label: const Text(
+                'Lihat Kelas',
+                style: TextStyle(
+                    color: Color(0xFF5B6BC4), fontWeight: FontWeight.w600),
+              ),
+              elevation: 4,
+            ),
+            const SizedBox(height: 12),
+            // Tambah Kelas Button
+            FloatingActionButton.extended(
+              heroTag: 'tambah_kelas',
+              onPressed: () {
+                setState(() => _isFabExpanded = false);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        TambahKelasMentor(mentorData: currentMentorData),
+                  ),
+                );
+              },
+              backgroundColor: Colors.white,
+              icon: const Icon(Icons.add, color: Color(0xFF5B6BC4)),
+              label: const Text(
+                'Tambah Kelas',
+                style: TextStyle(
+                    color: Color(0xFF5B6BC4), fontWeight: FontWeight.w600),
+              ),
+              elevation: 4,
+            ),
+            const SizedBox(height: 12),
+          ],
+          // Main FAB
+          FloatingActionButton(
+            heroTag: 'main_fab',
+            onPressed: () {
+              setState(() => _isFabExpanded = !_isFabExpanded);
+            },
+            backgroundColor: const Color(0xFF5B6BC4),
+            child: AnimatedRotation(
+              turns: _isFabExpanded ? 0.125 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: const Icon(Icons.school, color: Colors.white),
+            ),
+            elevation: 4,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBerandaPage(BuildContext context, int totalSessions, int availableSlots, double earnings, double rating) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
             // Modern Header with Gradient
             Container(
               padding: EdgeInsets.fromLTRB(
@@ -799,126 +925,6 @@ class _DashboardMentorState extends State<DashboardMentor> {
             ),
           ],
         ),
-      ), // Close SingleChildScrollView (body param)
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_isFabExpanded) ...[
-            // Lihat Kelas Button
-            FloatingActionButton.extended(
-              heroTag: 'lihat_kelas',
-              onPressed: () {
-                setState(() => _isFabExpanded = false);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        DaftarKelasMentor(mentorData: currentMentorData),
-                  ),
-                );
-              },
-              backgroundColor: Colors.white,
-              icon: const Icon(Icons.list, color: Color(0xFF5B6BC4)),
-              label: const Text(
-                'Lihat Kelas',
-                style: TextStyle(
-                    color: Color(0xFF5B6BC4), fontWeight: FontWeight.w600),
-              ),
-              elevation: 4,
-            ),
-            const SizedBox(height: 12),
-            // Tambah Kelas Button
-            FloatingActionButton.extended(
-              heroTag: 'tambah_kelas',
-              onPressed: () {
-                setState(() => _isFabExpanded = false);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        TambahKelasMentor(mentorData: currentMentorData),
-                  ),
-                );
-              },
-              backgroundColor: Colors.white,
-              icon: const Icon(Icons.add, color: Color(0xFF5B6BC4)),
-              label: const Text(
-                'Tambah Kelas',
-                style: TextStyle(
-                    color: Color(0xFF5B6BC4), fontWeight: FontWeight.w600),
-              ),
-              elevation: 4,
-            ),
-            const SizedBox(height: 12),
-          ],
-          // Main FAB
-          FloatingActionButton(
-            heroTag: 'main_fab',
-            onPressed: () {
-              setState(() => _isFabExpanded = !_isFabExpanded);
-            },
-            backgroundColor: const Color(0xFF5B6BC4),
-            child: AnimatedRotation(
-              turns: _isFabExpanded ? 0.125 : 0,
-              duration: const Duration(milliseconds: 200),
-              child: const Icon(Icons.school, color: Colors.white),
-            ),
-            elevation: 4,
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 0,
-        selectedItemColor: Colors.blue[700],
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          if (index == 1) {
-            // Index 1 adalah icon history
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    TransactionMentor(mentorData: currentMentorData),
-              ),
-            );
-          } else if (index == 2) {
-            // Index 2 adalah icon chat
-            print('📱 Opening chat list with mentor data:');
-            print('   - uid: ${currentMentorData['uid']}');
-            print('   - id: ${currentMentorData['id']}');
-            print('   - nama: ${currentMentorData['nama_lengkap']}');
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatListPage(
-                  userData: currentMentorData,
-                  userType: 'mentor',
-                ),
-              ),
-            );
-          } else if (index == 3) {
-            // Index 3 adalah icon person
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    ProfileMentor(mentorData: currentMentorData),
-              ),
-            ).then((_) {
-              // Reload data when returning from profile
-              _loadLatestMentorData();
-            });
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.account_balance_wallet), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.chat), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: ''),
-        ],
-      ),
     );
   }
 

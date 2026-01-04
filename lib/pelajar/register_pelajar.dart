@@ -75,7 +75,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       print('📱 Starting phone verification for: ${_phone.text}');
-      
+
       // Start phone verification
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: _phone.text.trim(),
@@ -84,23 +84,24 @@ class _RegisterPageState extends State<RegisterPage> {
           // Auto-verification (Android only)
           print('✅ Auto-verification completed');
           Navigator.pop(context); // Close loading dialog
-          
+
           // Proceed with registration
           await _completeRegistration(credential, null);
         },
         verificationFailed: (FirebaseAuthException e) {
           print('❌ Phone verification failed: ${e.message}');
           Navigator.pop(context); // Close loading dialog
-          
+
           String errorMessage = 'Verifikasi nomor gagal';
           if (e.code == 'invalid-phone-number') {
-            errorMessage = 'Format nomor telepon tidak valid. Gunakan format: +62xxx';
+            errorMessage =
+                'Format nomor telepon tidak valid. Gunakan format: +62xxx';
           } else if (e.code == 'too-many-requests') {
             errorMessage = 'Terlalu banyak percobaan. Coba lagi nanti';
           } else {
             errorMessage = 'Error: ${e.message}';
           }
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(errorMessage)),
           );
@@ -108,7 +109,7 @@ class _RegisterPageState extends State<RegisterPage> {
         codeSent: (String verificationId, int? resendToken) async {
           print('📨 Verification code sent');
           Navigator.pop(context); // Close loading dialog
-          
+
           // Navigate to verification page
           final result = await Navigator.push(
             context,
@@ -124,7 +125,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
           );
-          
+
           // Handle result from verification page
           if (result != null && result['success'] == true) {
             await _completeRegistration(null, result);
@@ -134,11 +135,10 @@ class _RegisterPageState extends State<RegisterPage> {
           print('⏱️ Auto retrieval timeout');
         },
       );
-      
     } catch (e) {
       print('❌ Error starting phone verification: $e');
       Navigator.pop(context); // Close loading dialog
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Terjadi kesalahan: $e')),
       );
@@ -152,11 +152,13 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       print('📝 Starting registration completion...');
       final normalizedEmail = _email.text.trim().toLowerCase();
-      final phoneNumber = verificationResult?['phoneNumber'] ?? _phone.text.trim();
+      final phoneNumber =
+          verificationResult?['phoneNumber'] ?? _phone.text.trim();
 
       // 1. Create email/password account first
       print('🔐 Creating email/password account...');
-      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: normalizedEmail,
         password: _password.text,
       );
@@ -171,7 +173,7 @@ class _RegisterPageState extends State<RegisterPage> {
       // 2. Save user profile to RTDB
       print('💾 Saving profile to database...');
       final ref = FirebaseDatabase.instance.ref('pelajar').child(user.uid);
-      
+
       final profileData = {
         'email': normalizedEmail,
         'phone': phoneNumber,
@@ -184,7 +186,7 @@ class _RegisterPageState extends State<RegisterPage> {
       };
 
       await ref.set(profileData);
-      
+
       print('✅ Profile saved to database');
 
       // 3. Sign out so user needs to login with email/password
@@ -215,18 +217,18 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         );
       }
-      
     } catch (e) {
       print('❌ Error completing registration: $e');
-      
+
       if (mounted) {
         String errorMessage = 'Gagal menyimpan data';
         if (e.toString().contains('email-already-in-use')) {
-          errorMessage = 'Email sudah terdaftar. Silakan gunakan email lain atau login.';
+          errorMessage =
+              'Email sudah terdaftar. Silakan gunakan email lain atau login.';
         } else if (e.toString().contains('weak-password')) {
           errorMessage = 'Password terlalu lemah. Minimal 6 karakter.';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ $errorMessage'),

@@ -71,14 +71,14 @@ class _DaftarKelasMentorState extends State<DaftarKelasMentor> {
   Future<void> _hapusKelas(String kelasId) async {
     try {
       await FirebaseDatabase.instance.ref('kelas').child(kelasId).remove();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('✅ Kelas berhasil dihapus'),
           backgroundColor: Colors.green,
         ),
       );
-      
+
       _loadKelas(); // Reload data
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -262,10 +262,11 @@ class _DaftarKelasMentorState extends State<DaftarKelasMentor> {
                 const SizedBox(height: 8),
                 _buildInfoRow(Icons.calendar_today, formattedDate),
                 const SizedBox(height: 12),
-                
+
                 // Status badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: kelas['status'] == 'active'
                         ? Colors.green[50]
@@ -301,7 +302,8 @@ class _DaftarKelasMentorState extends State<DaftarKelasMentor> {
                 const SizedBox(height: 12),
 
                 // Jadwal info
-                if (kelas['jadwal_ids'] != null && (kelas['jadwal_ids'] as List).isNotEmpty)
+                if (kelas['jadwal_ids'] != null &&
+                    (kelas['jadwal_ids'] as List).isNotEmpty)
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -311,7 +313,8 @@ class _DaftarKelasMentorState extends State<DaftarKelasMentor> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.event_available, color: Colors.blue[700], size: 20),
+                        Icon(Icons.event_available,
+                            color: Colors.blue[700], size: 20),
                         const SizedBox(width: 8),
                         Text(
                           '${(kelas['jadwal_ids'] as List).length} Jadwal Terhubung',
@@ -324,7 +327,8 @@ class _DaftarKelasMentorState extends State<DaftarKelasMentor> {
                       ],
                     ),
                   ),
-                if (kelas['jadwal_ids'] != null && (kelas['jadwal_ids'] as List).isNotEmpty)
+                if (kelas['jadwal_ids'] != null &&
+                    (kelas['jadwal_ids'] as List).isNotEmpty)
                   const SizedBox(height: 12),
 
                 // Action buttons
@@ -397,7 +401,8 @@ class _DaftarKelasMentorState extends State<DaftarKelasMentor> {
   Future<void> _showManageJadwalDialog(Map<String, dynamic> kelas) async {
     // Load all jadwal
     final mentorUid = widget.mentorData['uid'] ?? widget.mentorData['id'];
-    final snapshot = await FirebaseDatabase.instance.ref('jadwal').child(mentorUid).get();
+    final snapshot =
+        await FirebaseDatabase.instance.ref('jadwal').child(mentorUid).get();
 
     List<Map<String, dynamic>> allJadwal = [];
     Set<String> currentJadwalIds = {};
@@ -553,25 +558,29 @@ class _ManageJadwalDialogState extends State<_ManageJadwalDialog> {
                   final jadwalId = jadwal['id'];
                   final isSelected = selectedJadwalIds.contains(jadwalId);
                   final isAvailable = jadwal['status'] == 'available';
-                  final hasOtherKelas = jadwal['kelas_id'] != null && 
-                                       jadwal['kelas_id'] != widget.kelasId;
+                  final hasOtherKelas = jadwal['kelas_id'] != null &&
+                      jadwal['kelas_id'] != widget.kelasId;
 
                   return CheckboxListTile(
                     value: isSelected,
-                    onChanged: (!isAvailable || hasOtherKelas) ? null : (value) {
-                      setState(() {
-                        if (value == true) {
-                          selectedJadwalIds.add(jadwalId);
-                        } else {
-                          selectedJadwalIds.remove(jadwalId);
-                        }
-                      });
-                    },
+                    onChanged: (!isAvailable || hasOtherKelas)
+                        ? null
+                        : (value) {
+                            setState(() {
+                              if (value == true) {
+                                selectedJadwalIds.add(jadwalId);
+                              } else {
+                                selectedJadwalIds.remove(jadwalId);
+                              }
+                            });
+                          },
                     title: Text(
                       jadwal['mata_pelajaran'] ?? 'Mata Pelajaran',
                       style: TextStyle(
                         fontWeight: FontWeight.w500,
-                        color: (!isAvailable || hasOtherKelas) ? Colors.grey : Colors.black,
+                        color: (!isAvailable || hasOtherKelas)
+                            ? Colors.grey
+                            : Colors.black,
                       ),
                     ),
                     subtitle: Column(
@@ -614,7 +623,8 @@ class _ManageJadwalDialogState extends State<_ManageJadwalDialog> {
                       ),
                       child: Icon(
                         Icons.schedule,
-                        color: isSelected ? const Color(0xFF5B6BC4) : Colors.grey,
+                        color:
+                            isSelected ? const Color(0xFF5B6BC4) : Colors.grey,
                         size: 20,
                       ),
                     ),

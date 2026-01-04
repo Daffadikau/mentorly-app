@@ -21,7 +21,8 @@ Widget buildWebImage(String url, {VoidCallback? onTap}) {
       if (onTap != null) onTap();
     });
 
-  final String viewType = 'image-${url.hashCode}-${DateTime.now().millisecondsSinceEpoch}';
+  final String viewType =
+      'image-${url.hashCode}-${DateTime.now().millisecondsSinceEpoch}';
 
   ui_web.platformViewRegistry.registerViewFactory(
     viewType,

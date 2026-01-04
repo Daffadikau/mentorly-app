@@ -19,10 +19,14 @@ class DetailMentor extends StatefulWidget {
 
 class _DetailMentorState extends State<DetailMentor> {
   List<Map<String, dynamic>> jadwalList = [];
+  List<Map<String, dynamic>> kelasList = [];
+  List<Map<String, dynamic>> allJadwalList = []; // Store all jadwal
   Map<String, List<Map<String, dynamic>>> groupedJadwal = {};
   bool isLoadingJadwal = true;
+  bool isLoadingKelas = true;
   DateTime selectedDate = DateTime.now();
   Map<String, dynamic>? selectedJadwal;
+  Map<String, dynamic>? selectedKelas; // Track selected kelas
   String? chatRoomId;
   bool hasBooked = false;
 
@@ -30,6 +34,7 @@ class _DetailMentorState extends State<DetailMentor> {
   void initState() {
     super.initState();
     _loadJadwal();
+    _loadKelas();
     _checkChatRoom();
   }
 
@@ -144,8 +149,9 @@ class _DetailMentorState extends State<DetailMentor> {
         String pelajarName = widget.pelajarData['nama_lengkap'] ?? 'Pelajar';
         String subject = selectedJadwal!['mata_pelajaran'] ?? 'Mentoring';
         String date = selectedJadwal!['tanggal'] ?? '';
-        String timeRange = '${selectedJadwal!['jam_mulai']} - ${selectedJadwal!['jam_selesai']}';
-        
+        String timeRange =
+            '${selectedJadwal!['jam_mulai']} - ${selectedJadwal!['jam_selesai']}';
+
         await NotificationService.sendBookingNotification(
           mentorId: mentorUid.toString(),
           pelajarName: pelajarName,
@@ -197,14 +203,14 @@ class _DetailMentorState extends State<DetailMentor> {
 
         if (data is Map) {
           print('📊 Found ${data.length} jadwal entries');
-          
+
           // Get current date and time
           final now = DateTime.now();
-          
+
           data.forEach((key, value) {
             print(
                 '  - Jadwal key: $key, status: ${value is Map ? value['status'] : 'unknown'}');
-            
+
             if (value is Map && value['status'] == 'available') {
               // Parse jadwal date and time
               try {
@@ -217,16 +223,18 @@ class _DetailMentorState extends State<DetailMentor> {
                   int.parse(jamMulai[0]),
                   int.parse(jamMulai[1]),
                 );
-                
+
                 // Only show future schedules
                 if (jadwalDateTime.isAfter(now)) {
                   tempList.add({
                     'id': key,
                     ...Map<String, dynamic>.from(value),
                   });
-                  print('  ✅ Added: ${value['tanggal']} ${value['jam_mulai']} (future)');
+                  print(
+                      '  ✅ Added: ${value['tanggal']} ${value['jam_mulai']} (future)');
                 } else {
-                  print('  ⏭️ Skipped: ${value['tanggal']} ${value['jam_mulai']} (past)');
+                  print(
+                      '  ⏭️ Skipped: ${value['tanggal']} ${value['jam_mulai']} (past)');
                 }
               } catch (e) {
                 print('  ❌ Error parsing jadwal time: $e');
@@ -256,6 +264,7 @@ class _DetailMentorState extends State<DetailMentor> {
         }
 
         setState(() {
+          allJadwalList = tempList; // Store all jadwal
           jadwalList = tempList;
           groupedJadwal = grouped;
           isLoadingJadwal = false;
@@ -275,6 +284,258 @@ class _DetailMentorState extends State<DetailMentor> {
       print('Error loading jadwal: $e');
       setState(() => isLoadingJadwal = false);
     }
+  }
+
+  Future<void> _loadKelas() async {
+    setState(() => isLoadingKelas = true);
+
+    try {
+      final mentorUid = widget.mentorData['uid'] ?? widget.mentorData['id'];
+      print('🔍 Loading kelas for mentor UID: $mentorUid');
+
+      final snapshot = await FirebaseDatabase.instance.ref('kelas').get();
+
+      if (snapshot.exists && snapshot.value != null) {
+        final data = snapshot.value;
+        List<Map<String, dynamic>> tempList = [];
+
+        if (data is Map) {
+          data.forEach((key, value) {
+            if (value is Map) {
+              final kelasData = Map<String, dynamic>.from(value);
+              // Filter by mentor_uid and active status
+              if (kelasData['mentor_uid'] == mentorUid &&
+                  kelasData['status'] == 'active') {
+                tempList.add({
+                  'id': key,
+                  ...kelasData,
+                });
+                print('  ✓ Found kelas: ${kelasData['course_name']} - ${kelasData['category']}');
+              }
+            }
+          });
+        }
+
+        print('✅ Total kelas found: ${tempList.length}');
+
+        setState(() {
+          kelasList = tempList;
+          isLoadingKelas = false;
+        });
+      } else {
+        print('⚠️ No kelas found');
+        setState(() {
+          kelasList = [];
+          isLoadingKelas = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading kelas: $e');
+      setState(() => isLoadingKelas = false);
+    }
+  }
+
+  void _filterJadwalByKelas() {
+    if (selectedKelas == null) {
+      // Show all jadwal
+      List<Map<String, dynamic>> tempList = allJadwalList;
+      
+      // Group by date
+      Map<String, List<Map<String, dynamic>>> grouped = {};
+      for (var jadwal in tempList) {
+        final tanggal = jadwal['tanggal'];
+        if (!grouped.containsKey(tanggal)) {
+          grouped[tanggal] = [];
+        }
+        grouped[tanggal]!.add(jadwal);
+      }
+
+      setState(() {
+        jadwalList = tempList;
+        groupedJadwal = grouped;
+        if (grouped.isNotEmpty) {
+          selectedDate = DateTime.parse(grouped.keys.first);
+        }
+      });
+    } else {
+      // Filter jadwal by selected kelas
+      final kelasCategory = selectedKelas!['category']?.toString().toLowerCase() ?? '';
+      final kelasName = selectedKelas!['course_name']?.toString().toLowerCase() ?? '';
+      
+      List<Map<String, dynamic>> tempList = allJadwalList.where((jadwal) {
+        final jadwalMataPelajaran = jadwal['mata_pelajaran']?.toString().toLowerCase() ?? '';
+        
+        // Match by category or course name
+        return jadwalMataPelajaran.contains(kelasCategory) ||
+               jadwalMataPelajaran.contains(kelasName) ||
+               kelasName.contains(jadwalMataPelajaran);
+      }).toList();
+
+      // Group by date
+      Map<String, List<Map<String, dynamic>>> grouped = {};
+      for (var jadwal in tempList) {
+        final tanggal = jadwal['tanggal'];
+        if (!grouped.containsKey(tanggal)) {
+          grouped[tanggal] = [];
+        }
+        grouped[tanggal]!.add(jadwal);
+      }
+
+      setState(() {
+        jadwalList = tempList;
+        groupedJadwal = grouped;
+        if (grouped.isNotEmpty) {
+          selectedDate = DateTime.parse(grouped.keys.first);
+        }
+      });
+    }
+  }
+
+  void _showKelasDetailDialog(Map<String, dynamic> kelas) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue[700],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.school,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                kelas['course_name'] ?? 'Kelas',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow(Icons.category, 'Kategori', kelas['category'] ?? '-'),
+            const SizedBox(height: 12),
+            _buildDetailRow(Icons.person, 'Level', kelas['class_level'] ?? '-'),
+            const SizedBox(height: 12),
+            _buildDetailRow(Icons.access_time, 'Durasi', kelas['duration'] ?? '-'),
+            const SizedBox(height: 12),
+            _buildDetailRow(Icons.person_outline, 'Mentor', widget.mentorData['nama_lengkap'] ?? 'Mentor'),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Pilih jadwal di bawah untuk booking kelas ini',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.blue[900],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Scroll to jadwal section
+              if (groupedJadwal.isNotEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('📅 Silakan pilih jadwal yang tersedia di bawah'),
+                    duration: Duration(seconds: 2),
+                    backgroundColor: Colors.blue,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('⚠️ Mentor belum menambahkan jadwal untuk kelas ini'),
+                    duration: Duration(seconds: 2),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue[700],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Lihat Jadwal',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: Colors.blue[700]),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -433,13 +694,201 @@ class _DetailMentorState extends State<DetailMentor> {
                   ),
                   const SizedBox(height: 25),
 
-                  // Jadwal Section
+                  // Kelas Tersedia Section
                   const Text(
-                    "Jadwal",
+                    "Kelas Tersedia",
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
+                  ),
+                  const SizedBox(height: 15),
+
+                  if (isLoadingKelas)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (kelasList.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Mentor belum menambahkan kelas',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ),
+                    )
+                  else
+                    Column(
+                      children: kelasList.map((kelas) {
+                        final isSelected = selectedKelas != null && selectedKelas!['id'] == kelas['id'];
+                        
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              // Toggle selection
+                              if (isSelected) {
+                                selectedKelas = null; // Deselect
+                              } else {
+                                selectedKelas = kelas; // Select
+                              }
+                            });
+                            _filterJadwalByKelas(); // Filter jadwal
+                            _showKelasDetailDialog(kelas); // Show dialog
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: isSelected 
+                                    ? [Colors.blue[700]!, Colors.blue[800]!]
+                                    : [Colors.blue[50]!, Colors.blue[100]!],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected ? Colors.blue[900]! : Colors.blue[200]!, 
+                                width: isSelected ? 3 : 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: isSelected 
+                                      ? Colors.blue.withOpacity(0.4)
+                                      : Colors.blue.withOpacity(0.1),
+                                  blurRadius: isSelected ? 8 : 4,
+                                  offset: Offset(0, isSelected ? 4 : 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? Colors.white : Colors.blue[700],
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        isSelected ? Icons.check_circle : Icons.school,
+                                        color: isSelected ? Colors.blue[700] : Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            kelas['course_name'] ?? 'Kelas',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: isSelected ? Colors.white : Colors.black87,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            kelas['category'] ?? '',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: isSelected ? Colors.white.withOpacity(0.9) : Colors.grey[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      isSelected ? Icons.check : Icons.arrow_forward_ios,
+                                      size: 16,
+                                      color: isSelected ? Colors.white : Colors.blue[700],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    _buildKelasInfo(
+                                      Icons.person,
+                                      kelas['class_level'] ?? '-',
+                                      isSelected: isSelected,
+                                    ),
+                                    const SizedBox(width: 16),
+                                    _buildKelasInfo(
+                                      Icons.access_time,
+                                      kelas['duration'] ?? '-',
+                                      isSelected: isSelected,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                  const SizedBox(height: 25),
+
+                  // Jadwal Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Jadwal",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (selectedKelas != null)
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              selectedKelas = null;
+                            });
+                            _filterJadwalByKelas();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[700],
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Filter: ${selectedKelas!['course_name']}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(
+                                  Icons.clear,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 15),
 
@@ -706,8 +1155,11 @@ class _DetailMentorState extends State<DetailMentor> {
                           // Validate jadwal is not in the past
                           try {
                             final now = DateTime.now();
-                            final jadwalDate = DateTime.parse(selectedJadwal!['tanggal']);
-                            final jamMulai = selectedJadwal!['jam_mulai'].toString().split(':');
+                            final jadwalDate =
+                                DateTime.parse(selectedJadwal!['tanggal']);
+                            final jamMulai = selectedJadwal!['jam_mulai']
+                                .toString()
+                                .split(':');
                             final jadwalDateTime = DateTime(
                               jadwalDate.year,
                               jadwalDate.month,
@@ -715,11 +1167,12 @@ class _DetailMentorState extends State<DetailMentor> {
                               int.parse(jamMulai[0]),
                               int.parse(jamMulai[1]),
                             );
-                            
+
                             if (jadwalDateTime.isBefore(now)) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('❌ Tidak dapat booking jadwal yang sudah lewat'),
+                                  content: Text(
+                                      '❌ Tidak dapat booking jadwal yang sudah lewat'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
@@ -728,7 +1181,7 @@ class _DetailMentorState extends State<DetailMentor> {
                           } catch (e) {
                             print('Error validating jadwal time: $e');
                           }
-                          
+
                           // TODO: Navigate to booking confirmation
                           final dateStr =
                               DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(
@@ -917,6 +1370,27 @@ class _DetailMentorState extends State<DetailMentor> {
           fontWeight: FontWeight.w600,
         ),
       ),
+    );
+  }
+
+  Widget _buildKelasInfo(IconData icon, String text, {bool isSelected = false}) {
+    return Row(
+      children: [
+        Icon(
+          icon, 
+          size: 16, 
+          color: isSelected ? Colors.white : Colors.blue[700],
+        ),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 13,
+            color: isSelected ? Colors.white.withOpacity(0.9) : Colors.grey[700],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 

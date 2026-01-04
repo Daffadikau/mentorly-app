@@ -34,8 +34,12 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
     super.initState();
     _validateSession();
     profilePhotoUrl = widget.pelajarData['profile_photo_url'];
-    _namaController = TextEditingController(text: widget.pelajarData['nama'] ?? widget.pelajarData['nama_lengkap'] ?? '');
-    _emailController = TextEditingController(text: widget.pelajarData['email'] ?? '');
+    _namaController = TextEditingController(
+        text: widget.pelajarData['nama'] ??
+            widget.pelajarData['nama_lengkap'] ??
+            '');
+    _emailController =
+        TextEditingController(text: widget.pelajarData['email'] ?? '');
     _phoneController =
         TextEditingController(text: widget.pelajarData['phone'] ?? '');
     _passwordController = TextEditingController();
@@ -340,7 +344,9 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
                   ),
                   const SizedBox(height: 15),
                   Text(
-                    widget.pelajarData['nama'] ?? widget.pelajarData['nama_lengkap'] ?? 'Pelajar',
+                    widget.pelajarData['nama'] ??
+                        widget.pelajarData['nama_lengkap'] ??
+                        'Pelajar',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,

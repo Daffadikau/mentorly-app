@@ -51,9 +51,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     padding: const EdgeInsets.all(30),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        final iconSize = constraints.maxHeight > 600 ? 280.0 : constraints.maxHeight * 0.35;
-                        final spacing = constraints.maxHeight > 600 ? 50.0 : 20.0;
-                        
+                        final iconSize = constraints.maxHeight > 600
+                            ? 280.0
+                            : constraints.maxHeight * 0.35;
+                        final spacing =
+                            constraints.maxHeight > 600 ? 50.0 : 20.0;
+
                         return Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -69,8 +72,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                   index == 0
                                       ? Icons.school
                                       : index == 1
-                                      ? Icons.laptop_mac
-                                      : Icons.trending_up,
+                                          ? Icons.laptop_mac
+                                          : Icons.trending_up,
                                   size: iconSize * 0.43,
                                   color: Colors.white,
                                 ),
@@ -98,7 +101,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 },
               ),
             ),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -117,7 +119,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             ),
             const SizedBox(height: 30),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30),
               child: Column(
@@ -145,7 +146,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         ),
                       ),
                     ),
-
                   if (currentPage == onboardingData.length - 1)
                     SizedBox(
                       width: double.infinity,
@@ -171,9 +171,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         ),
                       ),
                     ),
-
                   const SizedBox(height: 15),
-
                   if (currentPage < onboardingData.length - 1)
                     TextButton(
                       onPressed: () {

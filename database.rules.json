@@ -24,10 +24,10 @@
       ".read": true,
       "$mentorUid": {
         ".read": true,
-        ".write": "$mentorUid === auth.uid || root.child('admin').child(auth.uid).exists()",
+        ".write": "auth != null",
         "$jadwalId": {
           ".read": true,
-          ".write": "$mentorUid === auth.uid || root.child('admin').child(auth.uid).exists()"
+          ".write": "auth != null"
         }
       }
     },

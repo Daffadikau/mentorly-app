@@ -6,7 +6,8 @@ import '../common/api_config.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import '../common/chat_room_web.dart' if (dart.library.io) '../common/chat_room_stub.dart';
+import '../common/chat_room_web.dart'
+    if (dart.library.io) '../common/chat_room_stub.dart';
 
 class DetailMentorAdmin extends StatelessWidget {
   final Map<String, dynamic> mentorData;
