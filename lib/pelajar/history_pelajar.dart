@@ -242,10 +242,7 @@ class _HistoryPelajarState extends State<HistoryPelajar> {
         backgroundColor: Colors.blue[700],
         elevation: 0,
         title: const Text("Riwayat", style: TextStyle(color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())

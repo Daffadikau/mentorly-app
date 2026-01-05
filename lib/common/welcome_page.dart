@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../pelajar/login_pelajar.dart';
 import '../mentor/login_mentor.dart';
-import '../admin/login_admin.dart';
 import '../utils/debug_account_manager.dart';
 import '../utils/firebase_restore_utility.dart';
 
@@ -65,17 +64,6 @@ class WelcomePage extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                           builder: (context) => const LoginMentor()),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  _buildRoleButton(
-                    context,
-                    "Admin",
-                    Icons.admin_panel_settings,
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const LoginAdmin()),
                     ),
                   ),
                   const SizedBox(height: 20),

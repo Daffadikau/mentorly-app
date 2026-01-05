@@ -236,10 +236,7 @@ class _ProfilePelajarState extends State<ProfilePelajar> {
         backgroundColor: Colors.blue[700],
         elevation: 0,
         title: const Text("Profil", style: TextStyle(color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
         child: Column(

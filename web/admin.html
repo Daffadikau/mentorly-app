@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Mentorly</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-box h1 {
+            color: #1976d2;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #1976d2;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #1565c0;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .error-msg {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .dashboard-container {
+            display: none;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #1976d2;
+            font-size: 28px;
+        }
+
+        .logout-btn {
+            padding: 10px 20px;
+            background: #d32f2f;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .logout-btn:hover {
+            background: #c62828;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #1976d2;
+        }
+
+        .tabs {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: #1976d2;
+            border-bottom-color: #1976d2;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .mentor-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .mentor-card {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #1976d2;
+        }
+
+        .mentor-card.pending {
+            border-left-color: #ff9800;
+        }
+
+        .mentor-card.verified {
+            border-left-color: #4caf50;
+        }
+
+        .mentor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .mentor-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .mentor-info p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.pending {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .status-badge.verified {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .mentor-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .detail-item {
+            font-size: 14px;
+        }
+
+        .detail-item strong {
+            color: #555;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .approve-btn {
+            background: #4caf50;
+            color: white;
+        }
+
+        .approve-btn:hover {
+            background: #43a047;
+        }
+
+        .reject-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .reject-btn:hover {
+            background: #e53935;
+        }
+
+        .view-btn {
+            background: #2196f3;
+            color: white;
+        }
+
+        .view-btn:hover {
+            background: #1976d2;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            max-width: 800px;
+            margin: 50px auto;
+            border-radius: 12px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            color: #333;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .detail-section {
+            margin-bottom: 25px;
+        }
+
+        .detail-section h3 {
+            color: #1976d2;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .detail-field {
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 6px;
+        }
+
+        .detail-field label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .detail-field p {
+            color: #333;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .tab-buttons {
+                flex-direction: column;
+            }
+
+            .mentor-header {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Section -->
+    <div id="loginSection" class="login-container">
+        <div class="login-box">
+            <h1>🎓 Admin Dashboard</h1>
+            <div id="loginError" class="error-msg"></div>
+            <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; color: #1565c0; border-left: 4px solid #1976d2;">
+                <strong>ℹ️ Catatan Keamanan:</strong><br>
+                Hanya email yang terdaftar di whitelist yang bisa akses dashboard. 
+                Edit <code>ADMIN_EMAILS</code> di file ini untuk menambah admin.
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email Admin</label>
+                    <input type="email" id="email" required placeholder="admin@mentorly.com">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn" id="loginBtn">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div id="dashboardSection" class="dashboard-container">
+        <div class="header">
+            <h1>Dashboard Admin</h1>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Mentor Pending</h3>
+                <div class="value" id="totalPending">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Mentor Verified</h3>
+                <div class="value" id="totalVerified">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Pelajar</h3>
+                <div class="value" id="totalPelajar">0</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="switchTab('pending')">
+                    Mentor Pending
+                </button>
+                <button class="tab-btn" onclick="switchTab('verified')">
+                    Mentor Verified
+                </button>
+                <button class="tab-btn" onclick="switchTab('pelajar')">
+                    Pelajar
+                </button>
+            </div>
+
+            <div id="pendingTab" class="tab-content active">
+                <div id="pendingList" class="mentor-list">
+                    <div class="loading">Memuat data...</div>
+                </div>
+            </div>
+
+            <div id="verifiedTab" class="tab-content">
+                <div id="verifiedList" class="mentor-list">
+                    <div class="loading">Memuat data...</div>
+                </div>
+            </div>
+
+            <div id="pelajarTab" class="tab-content">
+                <div id="pelajarList" class="mentor-list">
+                    <div class="loading">Memuat data...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Detail Mentor</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+    <script>
+        // Firebase Configuration - Sudah dikonfigurasi untuk project Mentorly
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9txG910vGx5tjXD96plrcpqYs2F5Fmio",
+            authDomain: "mentorly-66d07.firebaseapp.com",
+            databaseURL: "https://mentorly-66d07-default-rtdb.firebaseio.com",
+            projectId: "mentorly-66d07",
+            storageBucket: "mentorly-66d07.firebasestorage.app",
+            messagingSenderId: "282188392920",
+            appId: "1:282188392920:web:e97364323797b0e802aaad",
+            measurementId: "G-BVVVBB8BWK"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const database = firebase.database();
+
+        let currentTab = 'pending';
+
+        // ⚠️ WHITELIST EMAIL ADMIN - Hanya email ini yang bisa akses dashboard
+        const ADMIN_EMAILS = [
+            'admin@gmail.com'
+            // Tambahkan email admin lainnya di sini
+        ];
+
+        // Check if user is allowed admin access
+        function isAdminEmail(email) {
+            return ADMIN_EMAILS.includes(email.toLowerCase());
+        }
+
+        // Check if user is already logged in
+        auth.onAuthStateChanged(async user => {
+            if (user) {
+                // Verify if user email is in admin whitelist
+                if (!isAdminEmail(user.email)) {
+                    await auth.signOut();
+                    const errorMsg = document.getElementById('loginError');
+                    errorMsg.textContent = '⛔ Akses ditolak! Akun ini tidak memiliki izin admin.';
+                    errorMsg.style.display = 'block';
+                    showLogin();
+                    return;
+                }
+                showDashboard();
+                loadAllData();
+            } else {
+                showLogin();
+            }
+        });
+
+        // Login Function
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const errorMsg = document.getElementById('loginError');
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Loading...';
+            errorMsg.style.display = 'none';
+
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                // Verification will be done in onAuthStateChanged
+                // If email not in whitelist, user will be logged out automatically
+            } catch (error) {
+                errorMsg.textContent = getErrorMessage(error.code);
+                errorMsg.style.display = 'block';
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login';
+            }
+        });
+
+        function getErrorMessage(code) {
+            switch (code) {
+                case 'auth/invalid-email':
+                    return 'Email tidak valid';
+                case 'auth/user-not-found':
+                    return 'User tidak ditemukan';
+                case 'auth/wrong-password':
+                    return 'Password salah';
+                case 'auth/too-many-requests':
+                    return 'Terlalu banyak percobaan, coba lagi nanti';
+                default:
+                    return 'Login gagal: ' + code;
+            }
+        }
+
+        function showLogin() {
+            document.getElementById('loginSection').style.display = 'flex';
+            document.getElementById('dashboardSection').style.display = 'none';
+        }
+
+        function showDashboard() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('dashboardSection').style.display = 'block';
+        }
+
+        function logout() {
+            auth.signOut();
+        }
+
+        // Load All Data
+        async function loadAllData() {
+            await Promise.all([
+                loadPendingMentors(),
+                loadVerifiedMentors(),
+                loadPelajar()
+            ]);
+            updateStats();
+        }
+
+        let pendingMentors = [];
+        let verifiedMentors = [];
+        let pelajarList = [];
+
+        // Load Pending Mentors
+        async function loadPendingMentors() {
+            try {
+                const snapshot = await database.ref('mentors').once('value');
+                pendingMentors = [];
+
+                if (snapshot.exists()) {
+                    snapshot.forEach(child => {
+                        const mentor = child.val();
+                        if (mentor.status_verifikasi === 'pending') {
+                            pendingMentors.push({
+                                uid: child.key,
+                                ...mentor
+                            });
+                        }
+                    });
+                }
+
+                renderPendingMentors();
+            } catch (error) {
+                console.error('Error loading pending mentors:', error);
+                document.getElementById('pendingList').innerHTML = 
+                    '<div class="empty-state">Gagal memuat data</div>';
+            }
+        }
+
+        // Load Verified Mentors
+        async function loadVerifiedMentors() {
+            try {
+                const snapshot = await database.ref('mentors').once('value');
+                verifiedMentors = [];
+
+                if (snapshot.exists()) {
+                    snapshot.forEach(child => {
+                        const mentor = child.val();
+                        if (mentor.status_verifikasi === 'verified') {
+                            verifiedMentors.push({
+                                uid: child.key,
+                                ...mentor
+                            });
+                        }
+                    });
+                }
+
+                renderVerifiedMentors();
+            } catch (error) {
+                console.error('Error loading verified mentors:', error);
+                document.getElementById('verifiedList').innerHTML = 
+                    '<div class="empty-state">Gagal memuat data</div>';
+            }
+        }
+
+        // Load Pelajar
+        async function loadPelajar() {
+            try {
+                const snapshot = await database.ref('pelajar').once('value');
+                pelajarList = [];
+
+                if (snapshot.exists()) {
+                    snapshot.forEach(child => {
+                        pelajarList.push({
+                            uid: child.key,
+                            ...child.val()
+                        });
+                    });
+                }
+
+                renderPelajar();
+            } catch (error) {
+                console.error('Error loading pelajar:', error);
+                document.getElementById('pelajarList').innerHTML = 
+                    '<div class="empty-state">Gagal memuat data</div>';
+            }
+        }
+
+        // Render Functions
+        function renderPendingMentors() {
+            const container = document.getElementById('pendingList');
+            
+            if (pendingMentors.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+                        </svg>
+                        <p>Tidak ada mentor pending</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = pendingMentors.map(mentor => `
+                <div class="mentor-card pending">
+                    <div class="mentor-header">
+                        <div class="mentor-info">
+                            <h3>${mentor.nama_lengkap || 'N/A'}</h3>
+                            <p>${mentor.email || 'N/A'}</p>
+                        </div>
+                        <span class="status-badge pending">Pending</span>
+                    </div>
+                    <div class="mentor-details">
+                        <div class="detail-item">
+                            <strong>Phone:</strong> ${mentor.phone || 'N/A'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Mata Pelajaran:</strong> ${mentor.mata_pelajaran || 'N/A'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Pengalaman:</strong> ${mentor.pengalaman || 'N/A'} tahun
+                        </div>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="action-btn approve-btn" onclick="approveMentor('${mentor.uid}')">
+                            ✓ Approve
+                        </button>
+                        <button class="action-btn reject-btn" onclick="rejectMentor('${mentor.uid}')">
+                            ✗ Reject
+                        </button>
+                        <button class="action-btn view-btn" onclick="viewDetail('${mentor.uid}', 'pending')">
+                            👁 Detail
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderVerifiedMentors() {
+            const container = document.getElementById('verifiedList');
+            
+            if (verifiedMentors.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>Tidak ada mentor verified</p></div>';
+                return;
+            }
+
+            container.innerHTML = verifiedMentors.map(mentor => `
+                <div class="mentor-card verified">
+                    <div class="mentor-header">
+                        <div class="mentor-info">
+                            <h3>${mentor.nama_lengkap || 'N/A'}</h3>
+                            <p>${mentor.email || 'N/A'}</p>
+                        </div>
+                        <span class="status-badge verified">Verified</span>
+                    </div>
+                    <div class="mentor-details">
+                        <div class="detail-item">
+                            <strong>Phone:</strong> ${mentor.phone || 'N/A'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Mata Pelajaran:</strong> ${mentor.mata_pelajaran || 'N/A'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>Pengalaman:</strong> ${mentor.pengalaman || 'N/A'} tahun
+                        </div>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="action-btn view-btn" onclick="viewDetail('${mentor.uid}', 'verified')">
+                            👁 Detail
+                        </button>
+                        <button class="action-btn reject-btn" onclick="revokeMentor('${mentor.uid}')">
+                            🚫 Revoke
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderPelajar() {
+            const container = document.getElementById('pelajarList');
+            
+            if (pelajarList.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>Tidak ada pelajar terdaftar</p></div>';
+                return;
+            }
+
+            container.innerHTML = pelajarList.map(pelajar => `
+                <div class="mentor-card">
+                    <div class="mentor-header">
+                        <div class="mentor-info">
+                            <h3>${pelajar.nama || pelajar.nama_lengkap || 'N/A'}</h3>
+                            <p>${pelajar.email || 'N/A'}</p>
+                        </div>
+                    </div>
+                    <div class="mentor-details">
+                        <div class="detail-item">
+                            <strong>Phone:</strong> ${pelajar.phone || 'N/A'}
+                        </div>
+                        <div class="detail-item">
+                            <strong>UID:</strong> ${pelajar.uid || 'N/A'}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update Stats
+        function updateStats() {
+            document.getElementById('totalPending').textContent = pendingMentors.length;
+            document.getElementById('totalVerified').textContent = verifiedMentors.length;
+            document.getElementById('totalPelajar').textContent = pelajarList.length;
+        }
+
+        // Approve Mentor
+        async function approveMentor(uid) {
+            if (!confirm('Approve mentor ini?')) return;
+
+            try {
+                await database.ref(`mentors/${uid}`).update({
+                    status_verifikasi: 'verified',
+                    verified_at: new Date().toISOString()
+                });
+                alert('Mentor berhasil di-approve!');
+                await loadAllData();
+            } catch (error) {
+                console.error('Error approving mentor:', error);
+                alert('Gagal approve mentor: ' + error.message);
+            }
+        }
+
+        // Reject Mentor
+        async function rejectMentor(uid) {
+            if (!confirm('Reject mentor ini?')) return;
+
+            try {
+                await database.ref(`mentors/${uid}`).update({
+                    status_verifikasi: 'rejected',
+                    rejected_at: new Date().toISOString()
+                });
+                alert('Mentor berhasil di-reject!');
+                await loadAllData();
+            } catch (error) {
+                console.error('Error rejecting mentor:', error);
+                alert('Gagal reject mentor: ' + error.message);
+            }
+        }
+
+        // Revoke Mentor
+        async function revokeMentor(uid) {
+            if (!confirm('Revoke verifikasi mentor ini?')) return;
+
+            try {
+                await database.ref(`mentors/${uid}`).update({
+                    status_verifikasi: 'pending',
+                    revoked_at: new Date().toISOString()
+                });
+                alert('Verifikasi mentor berhasil di-revoke!');
+                await loadAllData();
+            } catch (error) {
+                console.error('Error revoking mentor:', error);
+                alert('Gagal revoke mentor: ' + error.message);
+            }
+        }
+
+        // View Detail
+        async function viewDetail(uid, type) {
+            const mentor = type === 'pending' 
+                ? pendingMentors.find(m => m.uid === uid)
+                : verifiedMentors.find(m => m.uid === uid);
+
+            if (!mentor) return;
+
+            // Load kelas for this mentor
+            let kelasList = [];
+            try {
+                const kelasSnapshot = await database.ref('kelas')
+                    .orderByChild('mentor_uid')
+                    .equalTo(uid)
+                    .once('value');
+                
+                if (kelasSnapshot.exists()) {
+                    kelasSnapshot.forEach(child => {
+                        const kelas = child.val();
+                        if (kelas.status === 'active') {
+                            kelasList.push({
+                                id: child.key,
+                                ...kelas
+                            });
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading kelas:', error);
+            }
+
+            const modalBody = document.getElementById('modalBody');
+            modalBody.innerHTML = `
+                <div class="detail-section">
+                    <h3>Informasi Pribadi</h3>
+                    <div class="detail-grid">
+                        <div class="detail-field">
+                            <label>Nama Lengkap</label>
+                            <p>${mentor.nama_lengkap || 'N/A'}</p>
+                        </div>
+                        <div class="detail-field">
+                            <label>Email</label>
+                            <p>${mentor.email || 'N/A'}</p>
+                        </div>
+                        <div class="detail-field">
+                            <label>Phone</label>
+                            <p>${mentor.phone || 'N/A'}</p>
+                        </div>
+                        <div class="detail-field">
+                            <label>UID</label>
+                            <p>${mentor.uid || 'N/A'}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h3>Informasi Mentor</h3>
+                    <div class="detail-grid">
+                        <div class="detail-field">
+                            <label>Mata Pelajaran</label>
+                            <p>${mentor.mata_pelajaran || 'N/A'}</p>
+                        </div>
+                        <div class="detail-field">
+                            <label>Pengalaman</label>
+                            <p>${mentor.pengalaman || 'N/A'} tahun</p>
+                        </div>
+                        <div class="detail-field">
+                            <label>Status</label>
+                            <p>${mentor.status_verifikasi || 'N/A'}</p>
+                        </div>
+                        <div class="detail-field">
+                            <label>Total Kelas</label>
+                            <p>${kelasList.length} kelas</p>
+                        </div>
+                    </div>
+                </div>
+
+                ${kelasList.length > 0 ? `
+                <div class="detail-section">
+                    <h3>Daftar Kelas (${kelasList.length})</h3>
+                    <div style="display: grid; gap: 10px;">
+                        ${kelasList.map(kelas => `
+                            <div style="padding: 15px; background: #f5f5f5; border-radius: 8px; border-left: 4px solid #1976d2;">
+                                <div style="font-weight: 600; color: #333; margin-bottom: 5px;">${kelas.course_name || 'N/A'}</div>
+                                <div style="font-size: 13px; color: #666;">
+                                    <span style="margin-right: 15px;">📚 ${kelas.category || 'N/A'}</span>
+                                    <span style="margin-right: 15px;">🎓 ${kelas.class_level || 'N/A'}</span>
+                                    <span>⏱️ ${kelas.duration || 'N/A'} menit</span>
+                                </div>
+                                ${kelas.enrolled_students ? `<div style="font-size: 12px; color: #1976d2; margin-top: 5px;">👥 ${kelas.enrolled_students} siswa terdaftar</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : '<div class="detail-section"><h3>Daftar Kelas</h3><p style="color: #999; font-style: italic;">Mentor belum memiliki kelas</p></div>'}
+
+                ${mentor.deskripsi ? `
+                <div class="detail-section">
+                    <h3>Deskripsi</h3>
+                    <p>${mentor.deskripsi}</p>
+                </div>
+                ` : ''}
+            `;
+
+            document.getElementById('detailModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+
+        // Switch Tab
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tab}Tab`).classList.add('active');
+        }
+
+        // Utility Functions
+        function formatNumber(num) {
+            return new Intl.NumberFormat('id-ID').format(num);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('detailModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
