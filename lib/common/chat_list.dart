@@ -82,6 +82,8 @@ class _ChatListPageState extends State<ChatListPage> {
 
           print('  ✅ Found matching room: ${entry.key}\n');
           room['room_id'] = entry.key;
+          room['unread_pelajar'] = room['unread_pelajar'] ?? 0;
+          room['unread_mentor'] = room['unread_mentor'] ?? 0;
 
           // Load last message - get all messages and find the latest one
           try {
@@ -314,6 +316,9 @@ class _ChatListPageState extends State<ChatListPage> {
     String lastSenderId = chatRoom['last_sender_id'] ?? '';
     String currentUserId =
         widget.userData['uid'] ?? widget.userData['id'].toString();
+    int unreadCount = widget.userType == 'pelajar'
+        ? (chatRoom['unread_pelajar'] ?? 0)
+        : (chatRoom['unread_mentor'] ?? 0);
 
     bool isMe = lastSenderId == currentUserId;
     String displayMessage = isMe ? 'Anda: $lastMessage' : lastMessage;
@@ -366,8 +371,8 @@ class _ChatListPageState extends State<ChatListPage> {
         ),
         title: Text(
           name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
+          style: TextStyle(
+            fontWeight: unreadCount > 0 ? FontWeight.w700 : FontWeight.bold,
             fontSize: 16,
           ),
         ),
@@ -405,8 +410,10 @@ class _ChatListPageState extends State<ChatListPage> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Colors.grey[600],
+                  color: unreadCount > 0 ? Colors.black87 : Colors.grey[600],
                   fontSize: 14,
+                  fontWeight:
+                      unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ],
@@ -419,16 +426,35 @@ class _ChatListPageState extends State<ChatListPage> {
             Text(
               _formatTime(lastMessageTime),
               style: TextStyle(
-                color: Colors.grey[500],
+                color: unreadCount > 0 ? Colors.blue[700] : Colors.grey[500],
                 fontSize: 12,
+                fontWeight:
+                    unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
-            const SizedBox(height: 4),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.grey[400],
-              size: 20,
-            ),
+            const SizedBox(height: 6),
+            unreadCount > 0
+                ? Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration
+                        (color: Colors.blue[700], borderRadius: BorderRadius.circular(12)),
+                    child: Text(
+                      unreadCount > 99
+                          ? '99+'
+                          : unreadCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
+                : Icon(
+                    Icons.chevron_right,
+                    color: Colors.grey[400],
+                    size: 20,
+                  ),
           ],
         ),
         onTap: () {

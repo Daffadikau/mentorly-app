@@ -49,6 +49,45 @@ class _ChatRoomState extends State<ChatRoom> {
   Map<String, dynamic>? bookingData;
   Map<String, dynamic>? jadwalData;
 
+  // Parse various date formats gracefully, including Indonesian day names.
+  DateTime? _parseBookingDate(dynamic rawDate) {
+    if (rawDate == null) return null;
+    final dateStr = rawDate.toString().trim();
+    if (dateStr.isEmpty) return null;
+
+    // Common numeric formats.
+    const patterns = ['yyyy-MM-dd', 'dd-MM-yyyy', 'dd/MM/yyyy'];
+    for (final pattern in patterns) {
+      try {
+        return DateFormat(pattern).parseStrict(dateStr);
+      } catch (_) {}
+    }
+
+    // Locale-aware formats that may include day names.
+    const localePatterns = ['EEEE, dd MMMM yyyy', 'dd MMMM yyyy'];
+    for (final pattern in localePatterns) {
+      try {
+        return DateFormat(pattern, 'id_ID').parseLoose(dateStr);
+      } catch (_) {}
+    }
+
+    // Weekday-only strings like "Kamis" → next occurrence from today.
+    try {
+      final weekday = DateFormat('EEEE', 'id_ID').parseLoose(dateStr);
+      final now = DateTime.now();
+      final diff = (weekday.weekday - now.weekday) % 7;
+      final candidate = now.add(Duration(days: diff));
+      return DateTime(candidate.year, candidate.month, candidate.day);
+    } catch (_) {}
+
+    // Last resort: native parser.
+    try {
+      return DateTime.parse(dateStr);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +95,51 @@ class _ChatRoomState extends State<ChatRoom> {
     _listenToNewMessages();
     _listenToIncomingCalls();
     _loadBookingData();
+  }
+
+  Future<void> _markMessagesAsRead(List<Map<String, dynamic>> loaded) async {
+    final currentUserId =
+        widget.currentUser['uid'] ?? widget.currentUser['id'].toString();
+    List<Future<void>> updates = [];
+
+    for (final msg in loaded) {
+      final senderId = (msg['sender_id'] ?? '').toString();
+      final isRead = msg['read'] == true;
+      final messageId = msg['id'];
+      if (messageId != null && !isRead && senderId != currentUserId) {
+        updates.add(_database
+            .child('messages')
+            .child(widget.roomId)
+            .child(messageId)
+            .update({'read': true}));
+      }
+    }
+
+    if (updates.isNotEmpty) {
+      await Future.wait(updates);
+    }
+
+    // Reset unread counter for this user in chat room
+    final unreadField = widget.userType == 'pelajar'
+        ? 'unread_pelajar'
+        : 'unread_mentor';
+    await _database
+        .child('chat_rooms')
+        .child(widget.roomId)
+        .update({unreadField: 0});
+  }
+
+  Future<void> _incrementUnreadForRecipient() async {
+    final field =
+        widget.userType == 'pelajar' ? 'unread_mentor' : 'unread_pelajar';
+    await _database.child('chat_rooms').child(widget.roomId).runTransaction(
+      (value) {
+        final map = (value as Map?) ?? {};
+        final current = map[field] ?? 0;
+        map[field] = (current is int ? current : int.tryParse(current.toString()) ?? 0) + 1;
+        return Transaction.success(map);
+      },
+    );
   }
 
   Future<void> _loadBookingData() async {
@@ -126,7 +210,7 @@ class _ChatRoomState extends State<ChatRoom> {
         .child('messages')
         .child(widget.roomId)
         .onChildAdded
-        .listen((event) {
+        .listen((event) async {
       if (!isLoading && event.snapshot.value != null) {
         Map<String, dynamic> message = Map<String, dynamic>.from(
           event.snapshot.value as Map<dynamic, dynamic>,
@@ -137,6 +221,26 @@ class _ChatRoomState extends State<ChatRoom> {
         bool messageExists = messages.any((m) => m['id'] == message['id']);
 
         if (!messageExists) {
+          final currentUserId =
+              widget.currentUser['uid'] ?? widget.currentUser['id'].toString();
+
+          // Mark as read immediately if this user is the recipient
+          if ((message['sender_id'] ?? '') != currentUserId) {
+            await _database
+                .child('messages')
+                .child(widget.roomId)
+                .child(message['id'])
+                .update({'read': true});
+
+            final unreadField = widget.userType == 'pelajar'
+                ? 'unread_pelajar'
+                : 'unread_mentor';
+            await _database
+                .child('chat_rooms')
+                .child(widget.roomId)
+                .update({unreadField: 0});
+          }
+
           setState(() {
             messages.add(message);
             messages.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
@@ -173,6 +277,8 @@ class _ChatRoomState extends State<ChatRoom> {
         // Sort by timestamp in Dart (no index needed)
         loadedMessages.sort(
             (a, b) => (a['timestamp'] ?? 0).compareTo(b['timestamp'] ?? 0));
+
+        await _markMessagesAsRead(loadedMessages);
 
         setState(() {
           messages = loadedMessages;
@@ -216,6 +322,9 @@ class _ChatRoomState extends State<ChatRoom> {
         'last_message_time': timestamp,
         'last_sender_id': currentUserId,
       });
+
+      // Increment unread for recipient
+      await _incrementUnreadForRecipient();
 
       // Send notification to recipient
       try {
@@ -428,6 +537,9 @@ class _ChatRoomState extends State<ChatRoom> {
         'last_sender_id': currentUserId,
       });
 
+      // Increment unread for recipient
+      await _incrementUnreadForRecipient();
+
       if (mounted) {
         setState(() {
           isUploading = false;
@@ -635,25 +747,35 @@ class _ChatRoomState extends State<ChatRoom> {
       String jamMulai = bookingData!['jam_mulai'];
       String jamSelesai = bookingData!['jam_selesai'];
 
-      // Parse date and times
-      DateTime sessionDate = DateTime.parse(tanggal);
-      List<String> startParts = jamMulai.split(':');
-      List<String> endParts = jamSelesai.split(':');
+      final sessionDate = _parseBookingDate(tanggal);
+      if (sessionDate == null) return 'unknown';
+
+      final startParts = jamMulai.split(':');
+      final endParts = jamSelesai.split(':');
+      if (startParts.length < 2 || endParts.length < 2) return 'unknown';
+
+      final startHour = int.tryParse(startParts[0]);
+      final startMinute = int.tryParse(startParts[1]);
+      final endHour = int.tryParse(endParts[0]);
+      final endMinute = int.tryParse(endParts[1]);
+      if (startHour == null || startMinute == null || endHour == null || endMinute == null) {
+        return 'unknown';
+      }
 
       DateTime startTime = DateTime(
         sessionDate.year,
         sessionDate.month,
         sessionDate.day,
-        int.parse(startParts[0]),
-        int.parse(startParts[1]),
+        startHour,
+        startMinute,
       );
 
       DateTime endTime = DateTime(
         sessionDate.year,
         sessionDate.month,
         sessionDate.day,
-        int.parse(endParts[0]),
-        int.parse(endParts[1]),
+        endHour,
+        endMinute,
       );
 
       DateTime now = DateTime.now();
@@ -680,9 +802,10 @@ class _ChatRoomState extends State<ChatRoom> {
     String jamSelesai = bookingData!['jam_selesai'];
 
     // Format date
-    DateTime date = DateTime.parse(tanggal);
-    String formattedDate =
-        DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(date);
+    final parsedDate = _parseBookingDate(tanggal);
+    String formattedDate = parsedDate != null
+      ? DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(parsedDate)
+      : tanggal;
 
     // Get status info
     Color statusColor;

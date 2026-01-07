@@ -54,7 +54,8 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
 
     try {
       print('🔍 Loading mentors from Firebase...');
-      final mentorSnapshot = await FirebaseDatabase.instance.ref('mentors').get();
+      final mentorSnapshot =
+          await FirebaseDatabase.instance.ref('mentors').get();
       final kelasSnapshot = await FirebaseDatabase.instance.ref('kelas').get();
 
       // Load all kelas first
@@ -113,6 +114,43 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
           });
         }
 
+        // Load real ratings from bookings
+        print('📊 Calculating real ratings from bookings...');
+        final bookingsSnapshot = await FirebaseDatabase.instance.ref('bookings').get();
+        if (bookingsSnapshot.exists) {
+          Map<String, List<double>> mentorRatings = {};
+          
+          final bookingsData = bookingsSnapshot.value as Map<dynamic, dynamic>;
+          for (var entry in bookingsData.entries) {
+            final booking = entry.value as Map<dynamic, dynamic>;
+            final mentorId = booking['mentor_id']?.toString() ?? '';
+            final rating = booking['rating'];
+            
+            if (mentorId.isNotEmpty && rating != null) {
+              final ratingValue = double.tryParse(rating.toString()) ?? 0;
+              if (ratingValue > 0) {
+                if (!mentorRatings.containsKey(mentorId)) {
+                  mentorRatings[mentorId] = [];
+                }
+                mentorRatings[mentorId]!.add(ratingValue);
+              }
+            }
+          }
+          
+          // Update mentor ratings
+          for (var mentor in tempList) {
+            final mentorId = mentor['uid'] ?? mentor['id'];
+            if (mentorRatings.containsKey(mentorId)) {
+              final ratings = mentorRatings[mentorId]!;
+              final avgRating = ratings.reduce((a, b) => a + b) / ratings.length;
+              mentor['rating'] = avgRating;
+              print('  📊 ${mentor['nama_lengkap']}: ${avgRating.toStringAsFixed(2)} (${ratings.length} reviews)');
+            } else {
+              mentor['rating'] = 0;
+            }
+          }
+        }
+
         print('✅ Total active & verified mentors: ${tempList.length}');
         setState(() {
           mentorList = tempList;
@@ -162,8 +200,10 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
       } else if (category == "⭐ Rating Tertinggi") {
         filteredMentorList = List.from(mentorList)
           ..sort((a, b) {
-            double ratingA = double.tryParse((a['rating'] ?? 0).toString()) ?? 0;
-            double ratingB = double.tryParse((b['rating'] ?? 0).toString()) ?? 0;
+            double ratingA =
+                double.tryParse((a['rating'] ?? 0).toString()) ?? 0;
+            double ratingB =
+                double.tryParse((b['rating'] ?? 0).toString()) ?? 0;
             return ratingB.compareTo(ratingA); // Descending order
           });
       } else if (category == "💰 Harga Termurah") {
@@ -178,52 +218,72 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
       } else {
         // Filter by subject - check both bidang_keahlian and kelas categories
         filteredMentorList = mentorList.where((mentor) {
-          String bidang = (mentor['bidang_keahlian'] ?? '').toString().toLowerCase();
-          List<String> kelasCategories = (mentor['kelas_categories'] as List<dynamic>?)
-              ?.map((e) => e.toString().toLowerCase())
-              .toList() ?? [];
-          
+          String bidang =
+              (mentor['bidang_keahlian'] ?? '').toString().toLowerCase();
+          List<String> kelasCategories =
+              (mentor['kelas_categories'] as List<dynamic>?)
+                      ?.map((e) => e.toString().toLowerCase())
+                      .toList() ??
+                  [];
+
           String searchCategory = category.toLowerCase();
-          
+
           // Remove emoji from category for matching
-          searchCategory = searchCategory.replaceAll(RegExp(r'[^\w\s]'), '').trim();
-          
+          searchCategory =
+              searchCategory.replaceAll(RegExp(r'[^\w\s]'), '').trim();
+
           // Check if any kelas category matches
           bool kelasMatches = kelasCategories.any((kelasCategory) {
-            if (searchCategory.contains('sosial') || searchCategory.contains('ips')) {
-              return kelasCategory.contains('sosial') || kelasCategory.contains('ips');
+            if (searchCategory.contains('sosial') ||
+                searchCategory.contains('ips')) {
+              return kelasCategory.contains('sosial') ||
+                  kelasCategory.contains('ips');
             }
-            if (searchCategory.contains('sains') || searchCategory.contains('ipa')) {
-              return kelasCategory.contains('sains') || kelasCategory.contains('ipa');
+            if (searchCategory.contains('sains') ||
+                searchCategory.contains('ipa')) {
+              return kelasCategory.contains('sains') ||
+                  kelasCategory.contains('ipa');
             }
-            if (searchCategory.contains('inggris') || searchCategory.contains('english')) {
-              return kelasCategory.contains('inggris') || kelasCategory.contains('english');
+            if (searchCategory.contains('inggris') ||
+                searchCategory.contains('english')) {
+              return kelasCategory.contains('inggris') ||
+                  kelasCategory.contains('english');
             }
             if (searchCategory.contains('indonesia')) {
-              return kelasCategory.contains('indonesia') || kelasCategory.contains('bahasa');
+              return kelasCategory.contains('indonesia') ||
+                  kelasCategory.contains('bahasa');
             }
             if (searchCategory.contains('program')) {
-              return kelasCategory.contains('program') || kelasCategory.contains('coding') || kelasCategory.contains('komputer');
+              return kelasCategory.contains('program') ||
+                  kelasCategory.contains('coding') ||
+                  kelasCategory.contains('komputer');
             }
             return kelasCategory.contains(searchCategory);
           });
-          
+
           // Check bidang_keahlian as well
           bool bidangMatches = false;
-          if (searchCategory.contains('sosial') || searchCategory.contains('ips')) {
+          if (searchCategory.contains('sosial') ||
+              searchCategory.contains('ips')) {
             bidangMatches = bidang.contains('sosial') || bidang.contains('ips');
-          } else if (searchCategory.contains('sains') || searchCategory.contains('ipa')) {
+          } else if (searchCategory.contains('sains') ||
+              searchCategory.contains('ipa')) {
             bidangMatches = bidang.contains('sains') || bidang.contains('ipa');
-          } else if (searchCategory.contains('inggris') || searchCategory.contains('english')) {
-            bidangMatches = bidang.contains('inggris') || bidang.contains('english');
+          } else if (searchCategory.contains('inggris') ||
+              searchCategory.contains('english')) {
+            bidangMatches =
+                bidang.contains('inggris') || bidang.contains('english');
           } else if (searchCategory.contains('indonesia')) {
-            bidangMatches = bidang.contains('indonesia') || bidang.contains('bahasa');
+            bidangMatches =
+                bidang.contains('indonesia') || bidang.contains('bahasa');
           } else if (searchCategory.contains('program')) {
-            bidangMatches = bidang.contains('program') || bidang.contains('coding') || bidang.contains('komputer');
+            bidangMatches = bidang.contains('program') ||
+                bidang.contains('coding') ||
+                bidang.contains('komputer');
           } else {
             bidangMatches = bidang.contains(searchCategory);
           }
-          
+
           // Return true if either bidang or any kelas matches
           return bidangMatches || kelasMatches;
         }).toList();
@@ -286,7 +346,8 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                       "Urutkan Berdasarkan",
                       [
                         _buildFilterChip("⭐ Rating Tertinggi", Icons.star),
-                        _buildFilterChip("💰 Harga Termurah", Icons.attach_money),
+                        _buildFilterChip(
+                            "💰 Harga Termurah", Icons.attach_money),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -298,7 +359,8 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                         _buildFilterChip("⚗️ Fisika", Icons.science),
                         _buildFilterChip("🧪 Kimia", Icons.biotech),
                         _buildFilterChip("🧬 Biologi", Icons.eco),
-                        _buildFilterChip("🏛️ IPS (Sosial)", Icons.account_balance),
+                        _buildFilterChip(
+                            "🏛️ IPS (Sosial)", Icons.account_balance),
                         _buildFilterChip("💼 Ekonomi", Icons.business),
                         _buildFilterChip("🌍 Geografi", Icons.public),
                         _buildFilterChip("📜 Sejarah", Icons.history_edu),
@@ -493,262 +555,279 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                         Expanded(
                           child: Text(
                             "Selamat Datang, ${widget.userData['nama_lengkap'] ?? 'Pelajar'}.",
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_forever,
-                                color: Colors.orange),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const ClearBookingsUtility(),
-                                ),
-                              );
-                            },
-                            tooltip: 'Clear Bookings',
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.logout, color: Colors.red),
-                            onPressed: () async {
-                              await SessionManager.logout();
-                              Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const WelcomePage(),
-                                ),
-                                (route) => false,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 15),
-                      TextField(
-                        controller: searchController,
-                        onChanged: filterMentors,
-                        decoration: InputDecoration(
-                          hintText: "Cari Mentor / Bidang",
-                          prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_forever,
+                              color: Colors.orange),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const ClearBookingsUtility(),
+                              ),
+                            );
+                          },
+                          tooltip: 'Clear Bookings',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.logout, color: Colors.red),
+                          onPressed: () async {
+                            await SessionManager.logout();
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const WelcomePage(),
+                              ),
+                              (route) => false,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+                    TextField(
+                      controller: searchController,
+                      onChanged: filterMentors,
+                      decoration: InputDecoration(
+                        hintText: "Cari Mentor / Bidang",
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
                       ),
-                      const SizedBox(height: 15),
-                      Row(
-                        children: [
-                          // Filter Button
-                          GestureDetector(
-                            onTap: _showFilterBottomSheet,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [Colors.blue[700]!, Colors.blue[500]!],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
+                    ),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: [
+                        // Filter Button
+                        GestureDetector(
+                          onTap: _showFilterBottomSheet,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.blue[700]!, Colors.blue[500]!],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(25),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.blue.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 ),
-                                borderRadius: BorderRadius.circular(25),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.blue.withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
+                              ],
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.filter_list,
+                                    color: Colors.white, size: 18),
+                                SizedBox(width: 6),
+                                Text(
+                                  "Filter",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
                                   ),
-                                ],
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.filter_list, color: Colors.white, size: 18),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    "Filter",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          // Quick filters
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  _buildTab("Semua"),
-                                  const SizedBox(width: 8),
-                                  _buildTab("⭐ Rating Tertinggi"),
-                                  const SizedBox(width: 8),
-                                  _buildTab("💰 Harga Termurah"),
-                                ],
-                              ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Quick filters
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _buildTab("Semua"),
+                                const SizedBox(width: 8),
+                                _buildTab("⭐ Rating Tertinggi"),
+                                const SizedBox(width: 8),
+                                _buildTab("💰 Harga Termurah"),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
+              ),
               Expanded(
                 child: isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : filteredMentorList.isEmpty
-                          ? const Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.search_off,
-                                      size: 80, color: Colors.grey),
-                                  SizedBox(height: 20),
-                                  Text(
-                                    "Mentor tidak ditemukan",
-                                    style: TextStyle(
-                                        color: Colors.grey, fontSize: 16),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : RefreshIndicator(
-                              onRefresh: loadMentors,
-                              child: ListView.builder(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 20),
-                                itemCount: filteredMentorList.length,
-                                itemBuilder: (context, index) {
-                                  var mentor = filteredMentorList[index];
-                                  return GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => DetailMentor(
-                                            mentorData: mentor,
-                                            pelajarData: widget.userData,
-                                          ),
+                    ? const Center(child: CircularProgressIndicator())
+                    : filteredMentorList.isEmpty
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.search_off,
+                                    size: 80, color: Colors.grey),
+                                SizedBox(height: 20),
+                                Text(
+                                  "Mentor tidak ditemukan",
+                                  style: TextStyle(
+                                      color: Colors.grey, fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: loadMentors,
+                            child: ListView.builder(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              itemCount: filteredMentorList.length,
+                              itemBuilder: (context, index) {
+                                var mentor = filteredMentorList[index];
+                                return GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => DetailMentor(
+                                          mentorData: mentor,
+                                          pelajarData: widget.userData,
                                         ),
-                                      );
-                                    },
-                                    child: Card(
-                                      margin: const EdgeInsets.only(bottom: 15),
-                                      elevation: 2,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(15),
-                                        child: Row(
-                                          children: [
-                                            CachedCircleAvatar(
-                                              imageUrl:
-                                                  mentor['profile_photo_url'],
-                                              radius: 30,
-                                              backgroundColor: Colors.blue[100],
-                                              iconColor: Colors.blue[700],
+                                    );
+                                  },
+                                  child: Card(
+                                    margin: const EdgeInsets.only(bottom: 15),
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(15),
+                                      child: Row(
+                                        children: [
+                                          CachedCircleAvatar(
+                                            imageUrl:
+                                                mentor['profile_photo_url'],
+                                            radius: 30,
+                                            backgroundColor: Colors.blue[100],
+                                            iconColor: Colors.blue[700],
+                                          ),
+                                          const SizedBox(width: 15),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  mentor['nama_lengkap'] ??
+                                                      'Nama tidak tersedia',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 5),
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Row(
+                                                        children: [
+                                                          // Rating stars
+                                                          ..._buildRatingStars(
+                                                            double.tryParse(
+                                                                    (mentor['rating'] ??
+                                                                            0)
+                                                                        .toString()) ??
+                                                                0,
+                                                            size: 14,
+                                                          ),
+                                                          const SizedBox(
+                                                              width: 6),
+                                                          Text(
+                                                            "${(double.tryParse((mentor['rating'] ?? 0).toString()) ?? 0).toStringAsFixed(1)}",
+                                                            style:
+                                                                const TextStyle(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              fontSize: 13,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 5),
+                                                Text(
+                                                  mentor['bidang_keahlian'] ??
+                                                      'Bidang tidak tersedia',
+                                                  style: TextStyle(
+                                                    color: Colors.grey[600],
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            const SizedBox(width: 15),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    mentor['nama_lengkap'] ??
-                                                        'Nama tidak tersedia',
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 16,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 5),
-                                                  Text(
-                                                    "Rp ${_formatCurrency(mentor['harga_per_jam'])} / jam",
-                                                    style: const TextStyle(
-                                                      color: Colors.orange,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 3),
-                                                  Text(
-                                                    mentor['bidang_keahlian'] ??
-                                                        'Bidang tidak tersedia',
-                                                    style: TextStyle(
-                                                      color: Colors.grey[600],
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 5,
                                             ),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                horizontal: 10,
-                                                vertical: 5,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    mentor['is_active'] == '1'
-                                                        ? Colors.green[100]
-                                                        : Colors.grey[200],
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  CircleAvatar(
-                                                    radius: 4,
-                                                    backgroundColor:
+                                            decoration: BoxDecoration(
+                                              color: mentor['is_active'] == '1'
+                                                  ? Colors.green[100]
+                                                  : Colors.grey[200],
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 4,
+                                                  backgroundColor:
+                                                      mentor['is_active'] == '1'
+                                                          ? Colors.green
+                                                          : Colors.grey,
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  mentor['is_active'] == '1'
+                                                      ? "Online"
+                                                      : "Offline",
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color:
                                                         mentor['is_active'] ==
                                                                 '1'
-                                                            ? Colors.green
-                                                            : Colors.grey,
+                                                            ? Colors.green[700]
+                                                            : Colors.grey[600],
+                                                    fontWeight: FontWeight.bold,
                                                   ),
-                                                  const SizedBox(width: 5),
-                                                  Text(
-                                                    mentor['is_active'] == '1'
-                                                        ? "Online"
-                                                        : "Offline",
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color:
-                                                          mentor['is_active'] ==
-                                                                  '1'
-                                                              ? Colors
-                                                                  .green[700]
-                                                              : Colors
-                                                                  .grey[600],
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                                ),
+                                              ],
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  );
-                                },
-                              ),
+                                  ),
+                                );
+                              },
                             ),
+                          ),
               ),
             ],
           ),
@@ -804,5 +883,47 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]}.',
         );
+  }
+
+  List<Widget> _buildRatingStars(double rating, {double size = 16}) {
+    List<Widget> stars = [];
+    int fullStars = rating.floor(); // Get integer part
+    double decimalPart = rating - fullStars;
+    bool hasHalfStar = decimalPart >= 0.5; // Half star only if >= 0.5
+
+    // Add full stars
+    for (int i = 0; i < fullStars; i++) {
+      stars.add(
+        Icon(
+          Icons.star,
+          color: Colors.amber[700],
+          size: size,
+        ),
+      );
+    }
+
+    // Add half star if needed
+    if (hasHalfStar && fullStars < 5) {
+      stars.add(
+        Icon(
+          Icons.star_half,
+          color: Colors.amber[700],
+          size: size,
+        ),
+      );
+      fullStars += 1;
+    }
+
+    // Add empty stars to complete 5 stars
+    for (int i = fullStars; i < 5; i++) {
+      stars.add(
+        Icon(
+          Icons.star_outline,
+          color: Colors.amber[300],
+          size: size,
+        ),
+      );
+    }
+    return stars;
   }
 }

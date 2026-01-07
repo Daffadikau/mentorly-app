@@ -30,12 +30,207 @@ class _DetailMentorState extends State<DetailMentor> {
   String? chatRoomId;
   bool hasBooked = false;
 
+  // Real stats from bookings
+  double realRating = 0.0;
+  int totalReviews = 0;
+  int totalStudents = 0;
+  int totalSessions = 0;
+  bool isLoadingStats = true;
+
+  DateTime? _parseDateFlexible(String dateStr) {
+    if (dateStr.isEmpty) return null;
+    for (final pattern in ['dd-MM-yyyy', 'yyyy-MM-dd']) {
+      try {
+        return DateFormat(pattern).parseStrict(dateStr);
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  DateTime? _getNextOccurrenceOfWeekday(
+    String hariName, {
+    required String jamMulai,
+    required String mentorUid,
+    required Map<dynamic, dynamic> allJadwalsData,
+  }) {
+    const hariMap = {
+      'Senin': 1,
+      'Selasa': 2,
+      'Rabu': 3,
+      'Kamis': 4,
+      'Jumat': 5,
+      'Sabtu': 6,
+      'Minggu': 7,
+    };
+
+    final targetWeekday = hariMap[hariName];
+    if (targetWeekday == null) return null;
+
+    DateTime now = DateTime.now();
+
+    // Parse jam mulai
+    final jamParts = jamMulai.split(':');
+    final jamMulaiInt = int.tryParse(jamParts[0]) ?? 0;
+    final menitMulaiInt =
+        jamParts.length > 1 ? int.tryParse(jamParts[1]) ?? 0 : 0;
+
+    // Check if today is the target weekday and time hasn't passed
+    DateTime current = DateTime(now.year, now.month, now.day);
+
+    if (current.weekday == targetWeekday) {
+      // Check if jam mulai hasn't passed yet
+      final jadwalTimeToday = DateTime(
+        current.year,
+        current.month,
+        current.day,
+        jamMulaiInt,
+        menitMulaiInt,
+      );
+
+      if (jadwalTimeToday.isAfter(now)) {
+        // Check if there's already a booking for today
+        bool hasBookingToday = _checkIfJadwalHasBooking(
+          hariName,
+          current,
+          mentorUid,
+          allJadwalsData,
+        );
+
+        if (!hasBookingToday) {
+          print(
+              '   ✅ Can use today ($hariName): time not passed yet and no booking');
+          return current;
+        } else {
+          print('   ⏭️ Today has booking, moving to next week');
+        }
+      } else {
+        print('   ⏭️ Time passed today, moving to next week');
+      }
+    }
+
+    // Find next occurrence of this weekday (next week onwards)
+    current = current.add(const Duration(days: 1));
+    while (true) {
+      if (current.weekday == targetWeekday) {
+        return current;
+      }
+      current = current.add(const Duration(days: 1));
+    }
+  }
+
+  bool _checkIfJadwalHasBooking(
+    String hariName,
+    DateTime date,
+    String mentorUid,
+    Map<dynamic, dynamic> allJadwalData,
+  ) {
+    // Check if there's a booking for this schedule on this date
+    for (var entry in allJadwalData.entries) {
+      var value = entry.value;
+      if (value is Map) {
+        final type = value['type']?.toString() ?? 'one_time';
+        final hari = value['hari']?.toString() ?? '';
+        final tanggal = value['tanggal']?.toString() ?? '';
+        final status = value['status']?.toString() ?? '';
+
+        // Check if it's the same schedule
+        if (type == 'weekly' && hari == hariName) {
+          // Check if status is 'booked'
+          if (status == 'booked') {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
     _loadJadwal();
     _loadKelas();
     _checkChatRoom();
+    _loadRealStats();
+  }
+
+  Future<void> _loadRealStats() async {
+    setState(() => isLoadingStats = true);
+
+    try {
+      final mentorUid = widget.mentorData['uid'] ?? widget.mentorData['id'];
+      
+      // Get all bookings for this mentor
+      final snapshot = await FirebaseDatabase.instance
+          .ref('bookings')
+          .orderByChild('mentor_id')
+          .equalTo(mentorUid.toString())
+          .get();
+
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        
+        double totalRating = 0;
+        int reviewCount = 0;
+        Set<String> uniqueStudents = {};
+        int sessionCount = 0;
+
+        for (var entry in data.entries) {
+          final booking = entry.value as Map<dynamic, dynamic>;
+          
+          // Skip cancelled sessions from count
+          final status = booking['status']?.toString().toLowerCase() ?? '';
+          final isCancelled = status == 'cancelled' || status == 'canceled';
+
+          if (!isCancelled) {
+            sessionCount++;
+          }
+
+          // Count unique students
+          final pelajarId = booking['pelajar_id']?.toString() ?? '';
+          if (pelajarId.isNotEmpty) {
+            uniqueStudents.add(pelajarId);
+          }
+
+          // Calculate rating from reviews
+          final rating = booking['rating'];
+          if (rating != null) {
+            final ratingValue = double.tryParse(rating.toString()) ?? 0;
+            if (ratingValue > 0) {
+              totalRating += ratingValue;
+              reviewCount++;
+            }
+          }
+        }
+
+        setState(() {
+          totalStudents = uniqueStudents.length;
+          totalReviews = reviewCount;
+          totalSessions = sessionCount;
+          realRating = reviewCount > 0 ? totalRating / reviewCount : 0.0;
+          isLoadingStats = false;
+        });
+
+        print('📊 Real Stats Loaded:');
+        print('   Students: $totalStudents');
+        print('   Reviews: $totalReviews');
+        print('   Rating: ${realRating.toStringAsFixed(2)}');
+      } else {
+        setState(() {
+          totalStudents = 0;
+          totalReviews = 0;
+          realRating = 0.0;
+          isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading real stats: $e');
+      setState(() {
+        isLoadingStats = false;
+      });
+    }
   }
 
   Future<void> _checkChatRoom() async {
@@ -97,21 +292,23 @@ class _DetailMentorState extends State<DetailMentor> {
         'created_at': timestamp,
         'last_message': 'Chat dimulai',
         'last_message_time': timestamp,
+        'unread_pelajar': 0,
+        'unread_mentor': 0,
       });
 
       print('🔄 Sending welcome message...');
       // Send automatic welcome message from mentor
       String mentorName =
           (widget.mentorData['nama_lengkap'] ?? 'Mentor').toString();
-      String bidangKeahlian =
-          (widget.mentorData['bidang_keahlian'] ?? 'berbagai bidang')
-              .toString();
-      String pengalaman = (widget.mentorData['pengalaman'] ?? 5).toString();
+        String pelajarName =
+          (widget.pelajarData['nama_lengkap'] ?? 'Pelajar').toString();
+        String tanggal = (selectedJadwal!['display_date'] ?? '-').toString();
+        String jamMulai = (selectedJadwal!['jam_mulai'] ?? '-').toString();
 
-      String welcomeMessage =
-          'Hai! Saya $mentorName, dan saat ini saya akan menjadi mentor Anda. '
-          'Saya berspesialisasi dalam $bidangKeahlian dengan pengalaman mengajar selama $pengalaman tahun. '
-          'Saya siap membantu Anda mencapai tujuan belajar. Jangan ragu untuk bertanya kapan saja! 😊';
+        String welcomeMessage =
+          'Hai $pelajarName! Saya $mentorName, dan di sesi kali ini saya akan menjadi mentor Anda. '
+          'Kita akan melakukan sesi mentoring pada $tanggal pukul $jamMulai. '
+          'Saya siap membantu Anda mencapai tujuan belajar. Jangan ragu untuk bertanya kapan saja! 😊🚀';
 
       await FirebaseDatabase.instance.ref('messages').child(roomId).push().set({
         'sender_id': mentorUid.toString(),
@@ -130,13 +327,23 @@ class _DetailMentorState extends State<DetailMentor> {
 
       print('🔄 Saving booking record...');
       // Save booking record
+      // Get ISO date string from scheduled_date for proper date storage
+      String isoDate = '';
+      if (selectedJadwal!['scheduled_date'] != null) {
+        DateTime scheduledDate = selectedJadwal!['scheduled_date'] as DateTime;
+        isoDate = DateFormat('yyyy-MM-dd').format(scheduledDate);
+      } else {
+        // Fallback to current date if scheduled_date is not available
+        isoDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      }
+
       await FirebaseDatabase.instance.ref('bookings').push().set({
         'pelajar_id': pelajarUid,
         'pelajar_name': widget.pelajarData['nama_lengkap'] ?? 'Pelajar',
         'mentor_id': mentorUid,
         'mentor_name': widget.mentorData['nama_lengkap'] ?? 'Mentor',
         'jadwal_id': selectedJadwal!['id'],
-        'tanggal': selectedJadwal!['tanggal'],
+        'tanggal': isoDate, // ISO date format for proper parsing
         'jam_mulai': selectedJadwal!['jam_mulai'],
         'jam_selesai': selectedJadwal!['jam_selesai'],
         'harga': widget.mentorData['harga_per_jam'] ?? 0,
@@ -148,7 +355,7 @@ class _DetailMentorState extends State<DetailMentor> {
       try {
         String pelajarName = widget.pelajarData['nama_lengkap'] ?? 'Pelajar';
         String subject = selectedJadwal!['mata_pelajaran'] ?? 'Mentoring';
-        String date = selectedJadwal!['tanggal'] ?? '';
+        String date = selectedJadwal!['display_date'] ?? '';
         String timeRange =
             '${selectedJadwal!['jam_mulai']} - ${selectedJadwal!['jam_selesai']}';
 
@@ -189,13 +396,11 @@ class _DetailMentorState extends State<DetailMentor> {
     try {
       final mentorUid = widget.mentorData['uid'] ?? widget.mentorData['id'];
       print('🔍 Loading jadwal for mentor UID: $mentorUid');
-      print('📊 Mentor data keys: ${widget.mentorData.keys.toList()}');
 
       final snapshot =
           await FirebaseDatabase.instance.ref('jadwal').child(mentorUid).get();
 
       print('📊 Snapshot exists: ${snapshot.exists}');
-      print('📊 Snapshot value: ${snapshot.value}');
 
       if (snapshot.exists && snapshot.value != null) {
         final data = snapshot.value;
@@ -208,81 +413,122 @@ class _DetailMentorState extends State<DetailMentor> {
           final now = DateTime.now();
 
           data.forEach((key, value) {
-            print(
-                '  - Jadwal key: $key, status: ${value is Map ? value['status'] : 'unknown'}');
+            if (value is! Map) return;
 
-            if (value is Map && value['status'] == 'available') {
-              // Parse jadwal date and time
-              try {
-                final jadwalDate = DateTime.parse(value['tanggal']);
-                final jamMulai = value['jam_mulai'].toString().split(':');
-                final jadwalDateTime = DateTime(
-                  jadwalDate.year,
-                  jadwalDate.month,
-                  jadwalDate.day,
-                  int.parse(jamMulai[0]),
-                  int.parse(jamMulai[1]),
+            final type = value['type']?.toString() ?? 'one_time';
+            final status = value['status']?.toString() ?? 'NO_STATUS';
+
+            print('📋 [$key] Type: $type, Status: $status');
+
+            if (status != 'available') {
+              print('   ⏭️ Skipped: status is not available');
+              return;
+            }
+
+            try {
+              DateTime? scheduledDate;
+              String displayDate = '';
+
+              if (type == 'weekly') {
+                // For weekly schedules, find next occurrence
+                final hari = value['hari']?.toString() ?? '';
+                final jamMulai = value['jam_mulai']?.toString() ?? '00:00';
+                scheduledDate = _getNextOccurrenceOfWeekday(
+                  hari,
+                  jamMulai: jamMulai,
+                  mentorUid: mentorUid,
+                  allJadwalsData: data,
                 );
-
-                // Only show future schedules
-                if (jadwalDateTime.isAfter(now)) {
-                  tempList.add({
-                    'id': key,
-                    ...Map<String, dynamic>.from(value),
-                  });
-                  print(
-                      '  ✅ Added: ${value['tanggal']} ${value['jam_mulai']} (future)');
-                } else {
-                  print(
-                      '  ⏭️ Skipped: ${value['tanggal']} ${value['jam_mulai']} (past)');
-                }
-              } catch (e) {
-                print('  ❌ Error parsing jadwal time: $e');
+                displayDate = hari;
+                print('   Weekly: $hari, Next: $scheduledDate');
+              } else {
+                // For one-time schedules, parse the date
+                final tanggalStr = value['tanggal']?.toString() ?? '';
+                scheduledDate = _parseDateFlexible(tanggalStr);
+                displayDate = tanggalStr;
+                print('   OneTime: $tanggalStr, Parsed: $scheduledDate');
               }
+
+              if (scheduledDate == null) {
+                print('   ❌ Failed to get scheduled date');
+                return;
+              }
+
+              final jamMulaiStr = value['jam_mulai']?.toString() ?? '00:00';
+              final jamMulaiParts = jamMulaiStr.split(':');
+              final jadwalDateTime = DateTime(
+                scheduledDate.year,
+                scheduledDate.month,
+                scheduledDate.day,
+                int.parse(jamMulaiParts[0]),
+                int.parse(jamMulaiParts[1]),
+              );
+
+              print('   🕐 Jadwal time: $jadwalDateTime, Now: $now');
+
+              if (jadwalDateTime.isAfter(now)) {
+                tempList.add({
+                  'id': key,
+                  'display_date': displayDate,
+                  'scheduled_date': scheduledDate,
+                  ...Map<String, dynamic>.from(value),
+                });
+                print('   ✅ ADDED');
+              } else {
+                print('   ⏭️ Skipped: time is in past');
+              }
+            } catch (e, st) {
+              print('   ❌ Error: $e\n$st');
             }
           });
         }
 
-        print('✅ Total available jadwal: ${tempList.length}');
+        print('✅ Total jadwal loaded: ${tempList.length}');
 
-        // Sort by date and time
+        // Sort by date
         tempList.sort((a, b) {
-          final dateA = DateTime.parse(a['tanggal']);
-          final dateB = DateTime.parse(b['tanggal']);
+          final dateA = a['scheduled_date'] as DateTime? ?? DateTime.now();
+          final dateB = b['scheduled_date'] as DateTime? ?? DateTime.now();
           if (dateA != dateB) return dateA.compareTo(dateB);
-          return a['jam_mulai'].compareTo(b['jam_mulai']);
+          return (a['jam_mulai'] ?? '').compareTo(b['jam_mulai'] ?? '');
         });
 
-        // Group by date
+        // Group by display date
         Map<String, List<Map<String, dynamic>>> grouped = {};
         for (var jadwal in tempList) {
-          final tanggal = jadwal['tanggal'];
-          if (!grouped.containsKey(tanggal)) {
-            grouped[tanggal] = [];
+          final displayDate = jadwal['display_date'] as String? ?? '';
+          if (!grouped.containsKey(displayDate)) {
+            grouped[displayDate] = [];
           }
-          grouped[tanggal]!.add(jadwal);
+          grouped[displayDate]!.add(jadwal);
         }
 
         setState(() {
-          allJadwalList = tempList; // Store all jadwal
+          allJadwalList = tempList;
           jadwalList = tempList;
           groupedJadwal = grouped;
           isLoadingJadwal = false;
-          // Set first available date as selected
           if (grouped.isNotEmpty) {
-            selectedDate = DateTime.parse(grouped.keys.first);
+            selectedDate =
+                (grouped.values.first.first['scheduled_date'] as DateTime?) ??
+                    DateTime.now();
           }
         });
       } else {
+        print('❌ No jadwal found');
         setState(() {
           jadwalList = [];
           groupedJadwal = {};
           isLoadingJadwal = false;
         });
       }
-    } catch (e) {
-      print('Error loading jadwal: $e');
-      setState(() => isLoadingJadwal = false);
+    } catch (e, st) {
+      print('❌ Error loading jadwal: $e\n$st');
+      setState(() {
+        jadwalList = [];
+        groupedJadwal = {};
+        isLoadingJadwal = false;
+      });
     }
   }
 
@@ -310,7 +556,8 @@ class _DetailMentorState extends State<DetailMentor> {
                   'id': key,
                   ...kelasData,
                 });
-                print('  ✓ Found kelas: ${kelasData['course_name']} - ${kelasData['category']}');
+                print(
+                    '  ✓ Found kelas: ${kelasData['course_name']} - ${kelasData['category']}');
               }
             }
           });
@@ -339,53 +586,60 @@ class _DetailMentorState extends State<DetailMentor> {
     if (selectedKelas == null) {
       // Show all jadwal
       List<Map<String, dynamic>> tempList = allJadwalList;
-      
-      // Group by date
+
+      // Group by display date
       Map<String, List<Map<String, dynamic>>> grouped = {};
       for (var jadwal in tempList) {
-        final tanggal = jadwal['tanggal'];
-        if (!grouped.containsKey(tanggal)) {
-          grouped[tanggal] = [];
+        final displayDate = jadwal['display_date'] as String? ?? '';
+        if (!grouped.containsKey(displayDate)) {
+          grouped[displayDate] = [];
         }
-        grouped[tanggal]!.add(jadwal);
+        grouped[displayDate]!.add(jadwal);
       }
 
       setState(() {
         jadwalList = tempList;
         groupedJadwal = grouped;
         if (grouped.isNotEmpty) {
-          selectedDate = DateTime.parse(grouped.keys.first);
+          selectedDate =
+              (grouped.values.first.first['scheduled_date'] as DateTime?) ??
+                  DateTime.now();
         }
       });
     } else {
       // Filter jadwal by selected kelas
-      final kelasCategory = selectedKelas!['category']?.toString().toLowerCase() ?? '';
-      final kelasName = selectedKelas!['course_name']?.toString().toLowerCase() ?? '';
-      
+      final kelasCategory =
+          selectedKelas!['category']?.toString().toLowerCase() ?? '';
+      final kelasName =
+          selectedKelas!['course_name']?.toString().toLowerCase() ?? '';
+
       List<Map<String, dynamic>> tempList = allJadwalList.where((jadwal) {
-        final jadwalMataPelajaran = jadwal['mata_pelajaran']?.toString().toLowerCase() ?? '';
-        
+        final jadwalMataPelajaran =
+            jadwal['mata_pelajaran']?.toString().toLowerCase() ?? '';
+
         // Match by category or course name
         return jadwalMataPelajaran.contains(kelasCategory) ||
-               jadwalMataPelajaran.contains(kelasName) ||
-               kelasName.contains(jadwalMataPelajaran);
+            jadwalMataPelajaran.contains(kelasName) ||
+            kelasName.contains(jadwalMataPelajaran);
       }).toList();
 
-      // Group by date
+      // Group by display date
       Map<String, List<Map<String, dynamic>>> grouped = {};
       for (var jadwal in tempList) {
-        final tanggal = jadwal['tanggal'];
-        if (!grouped.containsKey(tanggal)) {
-          grouped[tanggal] = [];
+        final displayDate = jadwal['display_date'] as String? ?? '';
+        if (!grouped.containsKey(displayDate)) {
+          grouped[displayDate] = [];
         }
-        grouped[tanggal]!.add(jadwal);
+        grouped[displayDate]!.add(jadwal);
       }
 
       setState(() {
         jadwalList = tempList;
         groupedJadwal = grouped;
         if (grouped.isNotEmpty) {
-          selectedDate = DateTime.parse(grouped.keys.first);
+          selectedDate =
+              (grouped.values.first.first['scheduled_date'] as DateTime?) ??
+                  DateTime.now();
         }
       });
     }
@@ -428,13 +682,16 @@ class _DetailMentorState extends State<DetailMentor> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDetailRow(Icons.category, 'Kategori', kelas['category'] ?? '-'),
+            _buildDetailRow(
+                Icons.category, 'Kategori', kelas['category'] ?? '-'),
             const SizedBox(height: 12),
             _buildDetailRow(Icons.person, 'Level', kelas['class_level'] ?? '-'),
             const SizedBox(height: 12),
-            _buildDetailRow(Icons.access_time, 'Durasi', kelas['duration'] ?? '-'),
+            _buildDetailRow(
+                Icons.access_time, 'Durasi', kelas['duration'] ?? '-'),
             const SizedBox(height: 12),
-            _buildDetailRow(Icons.person_outline, 'Mentor', widget.mentorData['nama_lengkap'] ?? 'Mentor'),
+            _buildDetailRow(Icons.person_outline, 'Mentor',
+                widget.mentorData['nama_lengkap'] ?? 'Mentor'),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(12),
@@ -473,7 +730,8 @@ class _DetailMentorState extends State<DetailMentor> {
               if (groupedJadwal.isNotEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('📅 Silakan pilih jadwal yang tersedia di bawah'),
+                    content:
+                        Text('📅 Silakan pilih jadwal yang tersedia di bawah'),
                     duration: Duration(seconds: 2),
                     backgroundColor: Colors.blue,
                   ),
@@ -481,7 +739,8 @@ class _DetailMentorState extends State<DetailMentor> {
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('⚠️ Mentor belum menambahkan jadwal untuk kelas ini'),
+                    content: Text(
+                        '⚠️ Mentor belum menambahkan jadwal untuk kelas ini'),
                     duration: Duration(seconds: 2),
                     backgroundColor: Colors.orange,
                   ),
@@ -627,17 +886,21 @@ class _DetailMentorState extends State<DetailMentor> {
                             const Icon(Icons.star,
                                 color: Colors.amber, size: 30),
                             const SizedBox(height: 5),
-                            const Text(
-                              "5.0",
-                              style: TextStyle(
+                            Text(
+                              isLoadingStats
+                                  ? "..."
+                                  : realRating.toStringAsFixed(1),
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
-                              "Rating",
+                              isLoadingStats
+                                  ? "Loading"
+                                  : "($totalReviews review${totalReviews != 1 ? 's' : ''})",
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 color: Colors.grey[600],
                               ),
                             ),
@@ -650,9 +913,11 @@ class _DetailMentorState extends State<DetailMentor> {
                             Icon(Icons.people,
                                 color: Colors.blue[700], size: 30),
                             const SizedBox(height: 5),
-                            const Text(
-                              "150+",
-                              style: TextStyle(
+                            Text(
+                              isLoadingStats
+                                  ? "..."
+                                  : "$totalStudents",
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -673,15 +938,15 @@ class _DetailMentorState extends State<DetailMentor> {
                             const Icon(Icons.school,
                                 color: Colors.green, size: 30),
                             const SizedBox(height: 5),
-                            const Text(
-                              "5+",
-                              style: TextStyle(
+                            Text(
+                              isLoadingStats ? "..." : "$totalSessions",
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
-                              "Tahun",
+                              "Sesi",
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -728,8 +993,9 @@ class _DetailMentorState extends State<DetailMentor> {
                   else
                     Column(
                       children: kelasList.map((kelas) {
-                        final isSelected = selectedKelas != null && selectedKelas!['id'] == kelas['id'];
-                        
+                        final isSelected = selectedKelas != null &&
+                            selectedKelas!['id'] == kelas['id'];
+
                         return GestureDetector(
                           onTap: () {
                             setState(() {
@@ -748,7 +1014,7 @@ class _DetailMentorState extends State<DetailMentor> {
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: isSelected 
+                                colors: isSelected
                                     ? [Colors.blue[700]!, Colors.blue[800]!]
                                     : [Colors.blue[50]!, Colors.blue[100]!],
                                 begin: Alignment.topLeft,
@@ -756,12 +1022,14 @@ class _DetailMentorState extends State<DetailMentor> {
                               ),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: isSelected ? Colors.blue[900]! : Colors.blue[200]!, 
+                                color: isSelected
+                                    ? Colors.blue[900]!
+                                    : Colors.blue[200]!,
                                 width: isSelected ? 3 : 1,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: isSelected 
+                                  color: isSelected
                                       ? Colors.blue.withOpacity(0.4)
                                       : Colors.blue.withOpacity(0.1),
                                   blurRadius: isSelected ? 8 : 4,
@@ -777,26 +1045,35 @@ class _DetailMentorState extends State<DetailMentor> {
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: isSelected ? Colors.white : Colors.blue[700],
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.blue[700],
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Icon(
-                                        isSelected ? Icons.check_circle : Icons.school,
-                                        color: isSelected ? Colors.blue[700] : Colors.white,
+                                        isSelected
+                                            ? Icons.check_circle
+                                            : Icons.school,
+                                        color: isSelected
+                                            ? Colors.blue[700]
+                                            : Colors.white,
                                         size: 20,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             kelas['course_name'] ?? 'Kelas',
                                             style: TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
-                                              color: isSelected ? Colors.white : Colors.black87,
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : Colors.black87,
                                             ),
                                           ),
                                           const SizedBox(height: 4),
@@ -804,16 +1081,23 @@ class _DetailMentorState extends State<DetailMentor> {
                                             kelas['category'] ?? '',
                                             style: TextStyle(
                                               fontSize: 13,
-                                              color: isSelected ? Colors.white.withOpacity(0.9) : Colors.grey[700],
+                                              color: isSelected
+                                                  ? Colors.white
+                                                      .withOpacity(0.9)
+                                                  : Colors.grey[700],
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
                                     Icon(
-                                      isSelected ? Icons.check : Icons.arrow_forward_ios,
+                                      isSelected
+                                          ? Icons.check
+                                          : Icons.arrow_forward_ios,
                                       size: 16,
-                                      color: isSelected ? Colors.white : Colors.blue[700],
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Colors.blue[700],
                                     ),
                                   ],
                                 ),
@@ -842,18 +1126,18 @@ class _DetailMentorState extends State<DetailMentor> {
 
                   const SizedBox(height: 25),
 
-                  // Jadwal Section
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Jadwal",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                  // Jadwal Section - Only show if kelas is selected
+                  if (selectedKelas != null) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Jadwal",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      if (selectedKelas != null)
                         GestureDetector(
                           onTap: () {
                             setState(() {
@@ -862,7 +1146,8 @@ class _DetailMentorState extends State<DetailMentor> {
                             _filterJadwalByKelas();
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: Colors.blue[700],
                               borderRadius: BorderRadius.circular(20),
@@ -888,117 +1173,125 @@ class _DetailMentorState extends State<DetailMentor> {
                             ),
                           ),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-
-                  if (isLoadingJadwal)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  else if (groupedJadwal.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Mentor belum menambahkan jadwal',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ),
-                    )
-                  else ...[
-                    // Date selector (horizontal scroll)
-                    SizedBox(
-                      height: 80,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: groupedJadwal.keys.length,
-                        itemBuilder: (context, index) {
-                          final dateStr = groupedJadwal.keys.toList()[index];
-                          final date = DateTime.parse(dateStr);
-                          final isSelected =
-                              DateFormat('yyyy-MM-dd').format(date) ==
-                                  DateFormat('yyyy-MM-dd').format(selectedDate);
-
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                selectedDate = date;
-                                selectedJadwal =
-                                    null; // Clear selection when changing date
-                              });
-                            },
-                            child: Container(
-                              width: 70,
-                              margin: const EdgeInsets.only(right: 10),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? Colors.blue[700]
-                                    : Colors.grey[100],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Colors.blue[700]!
-                                      : Colors.grey[300]!,
-                                ),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    DateFormat('E', 'id_ID').format(date),
-                                    style: TextStyle(
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.grey[700],
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    DateFormat('dd').format(date),
-                                    style: TextStyle(
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.black,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                      ],
                     ),
                     const SizedBox(height: 15),
+                    if (isLoadingJadwal)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (groupedJadwal.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Mentor belum menambahkan jadwal untuk kelas ini',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ),
+                      )
+                    else ...[
+                      // Date selector (horizontal scroll)
+                      SizedBox(
+                        height: 80,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: groupedJadwal.keys.length,
+                          itemBuilder: (context, index) {
+                            final displayDate =
+                                groupedJadwal.keys.toList()[index];
+                            final jadwalForDate =
+                                groupedJadwal[displayDate] ?? [];
+                            final scheduledDate = (jadwalForDate.isNotEmpty
+                                    ? jadwalForDate.first['scheduled_date']
+                                        as DateTime?
+                                    : null) ??
+                                DateTime.now();
+                            final isSelected = DateFormat('yyyy-MM-dd')
+                                    .format(scheduledDate) ==
+                                DateFormat('yyyy-MM-dd').format(selectedDate);
 
-                    // Time slots title
-                    const Text(
-                      "Jam",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedDate = scheduledDate;
+                                  selectedJadwal =
+                                      null; // Clear selection when changing date
+                                });
+                              },
+                              child: Container(
+                                width: 70,
+                                margin: const EdgeInsets.only(right: 10),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.blue[700]
+                                      : Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? Colors.blue[700]!
+                                        : Colors.grey[300]!,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      DateFormat('E', 'id_ID')
+                                          .format(scheduledDate),
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.grey[700],
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      DateFormat('dd').format(scheduledDate),
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.black,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
+                      const SizedBox(height: 15),
 
-                    // Time slots grid
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: _buildTimeSlots(),
-                    ),
-                  ],
+                      // Time slots title
+                      const Text(
+                        "Jam",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Time slots grid
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: _buildTimeSlots(),
+                      ),
+                    ],
+                  ], // End of jadwal section (only show if kelas selected)
 
                   const SizedBox(height: 25),
                   const Text(
@@ -1039,38 +1332,40 @@ class _DetailMentorState extends State<DetailMentor> {
                     ),
                   ),
                   const SizedBox(height: 25),
-                  const Text(
-                    "Harga",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  if (selectedKelas != null) ...[
+                    const Text(
+                      "Harga",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(15),
-                    decoration: BoxDecoration(
-                      color: Colors.orange[50],
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.orange[200]!),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Rp ${_formatCurrency(widget.mentorData['harga_per_jam'])} / jam",
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange[700],
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.orange[200]!),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Rp ${_formatCurrency(selectedKelas!['price'] ?? widget.mentorData['harga_per_jam'])} / sesi",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange[700],
+                            ),
                           ),
-                        ),
-                        Icon(Icons.attach_money,
-                            color: Colors.orange[700], size: 30),
-                      ],
+                          Icon(Icons.attach_money,
+                              color: Colors.orange[700], size: 30),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 25),
+                    const SizedBox(height: 25),
+                  ],
                   // Real reviews from bookings will be shown here in future update
                   // For now, removed fake demo reviews
                 ],
@@ -1155,8 +1450,9 @@ class _DetailMentorState extends State<DetailMentor> {
                           // Validate jadwal is not in the past
                           try {
                             final now = DateTime.now();
-                            final jadwalDate =
-                                DateTime.parse(selectedJadwal!['tanggal']);
+                            final jadwalDate = selectedJadwal!['scheduled_date']
+                                    as DateTime? ??
+                                now;
                             final jamMulai = selectedJadwal!['jam_mulai']
                                 .toString()
                                 .split(':');
@@ -1185,7 +1481,9 @@ class _DetailMentorState extends State<DetailMentor> {
                           // TODO: Navigate to booking confirmation
                           final dateStr =
                               DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(
-                                  DateTime.parse(selectedJadwal!['tanggal']));
+                                  selectedJadwal!['scheduled_date']
+                                          as DateTime? ??
+                                      DateTime.now());
                           final timeStr =
                               '${selectedJadwal!['jam_mulai']}-${selectedJadwal!['jam_selesai']}';
 
@@ -1297,8 +1595,24 @@ class _DetailMentorState extends State<DetailMentor> {
   }
 
   List<Widget> _buildTimeSlots() {
-    final selectedDateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
-    final slots = groupedJadwal[selectedDateStr] ?? [];
+    // Find the display_date key that matches the selected date
+    String? matchingDisplayDate;
+    for (final displayDate in groupedJadwal.keys) {
+      final jadwalList = groupedJadwal[displayDate] ?? [];
+      if (jadwalList.isNotEmpty) {
+        final scheduledDate = jadwalList.first['scheduled_date'] as DateTime?;
+        if (scheduledDate != null &&
+            DateFormat('yyyy-MM-dd').format(scheduledDate) ==
+                DateFormat('yyyy-MM-dd').format(selectedDate)) {
+          matchingDisplayDate = displayDate;
+          break;
+        }
+      }
+    }
+
+    final slots = matchingDisplayDate != null
+        ? groupedJadwal[matchingDisplayDate] ?? []
+        : [];
 
     if (slots.isEmpty) {
       return [
@@ -1373,12 +1687,13 @@ class _DetailMentorState extends State<DetailMentor> {
     );
   }
 
-  Widget _buildKelasInfo(IconData icon, String text, {bool isSelected = false}) {
+  Widget _buildKelasInfo(IconData icon, String text,
+      {bool isSelected = false}) {
     return Row(
       children: [
         Icon(
-          icon, 
-          size: 16, 
+          icon,
+          size: 16,
           color: isSelected ? Colors.white : Colors.blue[700],
         ),
         const SizedBox(width: 6),
@@ -1386,7 +1701,8 @@ class _DetailMentorState extends State<DetailMentor> {
           text,
           style: TextStyle(
             fontSize: 13,
-            color: isSelected ? Colors.white.withOpacity(0.9) : Colors.grey[700],
+            color:
+                isSelected ? Colors.white.withOpacity(0.9) : Colors.grey[700],
             fontWeight: FontWeight.w500,
           ),
         ),

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
 import 'detail_mentor_admin.dart';
@@ -24,6 +25,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
   };
   List mentorPending = [];
   List mentorVerified = [];
+  List<Map<String, dynamic>> upcomingBookings = [];
   bool isLoading = true;
   bool showVerified = false;
 
@@ -33,6 +35,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     loadStats();
     loadMentorPending();
     loadMentorVerified();
+    loadUpcomingSessions();
   }
 
   Future<void> loadStats() async {
@@ -45,6 +48,101 @@ class _DashboardAdminState extends State<DashboardAdmin> {
         "total_pengajar": mentorVerified.length
       };
     });
+  }
+
+  Future<void> loadUpcomingSessions() async {
+    try {
+      print('🔍 Loading upcoming sessions from Firebase...');
+      
+      final snapshot = await FirebaseDatabase.instance.ref('bookings').get();
+      
+      if (snapshot.exists) {
+        List<Map<String, dynamic>> tempList = [];
+        Map<dynamic, dynamic> bookings = snapshot.value as Map<dynamic, dynamic>;
+        
+        print('📦 Total bookings in Firebase: ${bookings.length}');
+        DateTime now = DateTime.now();
+        print('🕐 Current time: $now');
+        
+        for (var entry in bookings.entries) {
+          Map<String, dynamic> booking = Map<String, dynamic>.from(entry.value);
+          booking['id'] = entry.key;
+          
+          print('\n📋 Booking ${entry.key}:');
+          print('   Status: ${booking['status']}');
+          print('   Tanggal: ${booking['tanggal']}');
+          print('   Pelajar: ${booking['pelajar_name']}');
+          print('   Mentor: ${booking['mentor_name']}');
+          
+          // Only show confirmed bookings
+          if (booking['status'] != 'confirmed') {
+            print('   ⏭️ Skipped: status is not confirmed');
+            continue;
+          }
+          
+          try {
+            // Parse booking date
+            String tanggalStr = booking['tanggal'].toString();
+            print('   🔄 Parsing date: $tanggalStr');
+            DateTime bookingDate = DateTime.parse(tanggalStr);
+            print('   ✅ Parsed date: $bookingDate');
+            
+            // Parse jam_mulai (HH:mm format)
+            String jamMulaiStr = booking['jam_mulai'].toString();
+            List<String> timeParts = jamMulaiStr.split(':');
+            DateTime sessionStartTime = DateTime(
+              bookingDate.year,
+              bookingDate.month,
+              bookingDate.day,
+              int.parse(timeParts[0]),
+              int.parse(timeParts[1]),
+            );
+            
+            print('   🕐 Session time: $sessionStartTime');
+            print('   ⏰ Is future? ${sessionStartTime.isAfter(now)}');
+            
+            // Only show future sessions
+            if (sessionStartTime.isAfter(now)) {
+              tempList.add(booking);
+              print('   ✅ ADDED to upcoming list');
+            } else {
+              print('   ⏭️ Skipped: session is in the past');
+            }
+          } catch (e, stackTrace) {
+            print('   ❌ Error parsing date: $e');
+            print('   Stack: $stackTrace');
+          }
+        }
+        
+        // Sort by date ascending (nearest first)
+        tempList.sort((a, b) {
+          try {
+            DateTime dateA = DateTime.parse(a['tanggal']);
+            DateTime dateB = DateTime.parse(b['tanggal']);
+            return dateA.compareTo(dateB);
+          } catch (e) {
+            return 0;
+          }
+        });
+        
+        setState(() {
+          upcomingBookings = tempList;
+        });
+        
+        print('\n📊 Final result: ${tempList.length} upcoming sessions');
+      } else {
+        setState(() {
+          upcomingBookings = [];
+        });
+        print('ℹ️ No bookings node found in Firebase');
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error loading upcoming sessions: $e');
+      print('Stack: $stackTrace');
+      setState(() {
+        upcomingBookings = [];
+      });
+    }
   }
 
   Future<void> loadMentorPending() async {
@@ -167,6 +265,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     await loadStats();
     await loadMentorPending();
     await loadMentorVerified();
+    await loadUpcomingSessions();
   }
 
   Future<bool> _checkEmailVerification(String email) async {
@@ -596,6 +695,80 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                         ],
                       ),
                       const SizedBox(height: 20),
+                      
+                      // Upcoming Sessions Section
+                      Row(
+                        children: [
+                          Icon(Icons.upcoming_rounded,
+                              color: Colors.purple[700], size: 24),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "Sesi Mendatang",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      upcomingBookings.isEmpty
+                          ? Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(30),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(15),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.1),
+                                    spreadRadius: 1,
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.event_busy,
+                                      size: 60, color: Colors.grey[400]),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    "Belum ada sesi mendatang",
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: upcomingBookings.length > 5
+                                  ? 5
+                                  : upcomingBookings.length,
+                              itemBuilder: (context, index) {
+                                return _buildUpcomingSessionCard(
+                                    upcomingBookings[index]);
+                              },
+                            ),
+                      if (upcomingBookings.length > 5)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Center(
+                            child: Text(
+                              '... dan ${upcomingBookings.length - 5} sesi lainnya',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 30),
+
                       isLoading
                           ? const Center(
                               child: Padding(
@@ -1319,6 +1492,106 @@ class _DashboardAdminState extends State<DashboardAdmin> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildUpcomingSessionCard(Map<String, dynamic> booking) {
+    String pelajarName = booking['pelajar_name'] ?? 'Pelajar';
+    String mentorName = booking['mentor_name'] ?? 'Mentor';
+    String tanggal = booking['tanggal'] ?? '';
+    String jamMulai = booking['jam_mulai'] ?? '';
+    String jamSelesai = booking['jam_selesai'] ?? '';
+    
+    // Format date
+    String formattedDate = '';
+    try {
+      DateTime date = DateTime.parse(tanggal);
+      formattedDate = DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(date);
+    } catch (e) {
+      formattedDate = tanggal;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.purple.withOpacity(0.2), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purple.withOpacity(0.08),
+            spreadRadius: 1,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.purple[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.school, color: Colors.purple[700], size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        pelajarName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        'dengan $mentorName',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    formattedDate,
+                    style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 8),
+                Text(
+                  '$jamMulai - $jamSelesai WIB',
+                  style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

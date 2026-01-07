@@ -57,9 +57,10 @@ dependencies:
   firebase_storage: ^12.0.0
   firebase_messaging: ^15.0.0
   flutter_local_notifications: ^17.0.0
-  file_picker: ^6.1.0
-  image_picker: ^1.0.7
+  # Update to latest major to align federated desktop/web plugins
+  file_picker: ^10.3.8
   cached_network_image: ^3.3.1
+  image_picker: ^1.0.7
   url_launcher: ^6.2.0
   syncfusion_flutter_pdfviewer: ^27.1.58
   intl: ^0.19.0

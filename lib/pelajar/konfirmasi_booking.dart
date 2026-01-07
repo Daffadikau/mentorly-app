@@ -106,15 +106,18 @@ class KonfirmasiBooking extends StatelessWidget {
 
       // Create new chat room only if it doesn't exist
       if (!roomExists) {
+        final nowTs = DateTime.now().millisecondsSinceEpoch;
         await database.child('chat_rooms').push().set({
           'mentor_id': mentorId,
           'pelajar_id': pelajarId,
           'mentor_name': mentorData['nama_lengkap'],
           'pelajar_name': pelajarData['nama_lengkap'],
-          'created_at': DateTime.now().millisecondsSinceEpoch,
+          'created_at': nowTs,
           'last_message': 'Chat room telah dibuat',
-          'last_message_time': DateTime.now().millisecondsSinceEpoch,
+          'last_message_time': nowTs,
           'last_sender_id': pelajarId,
+          'unread_pelajar': 0,
+          'unread_mentor': 0,
         });
 
         print(
