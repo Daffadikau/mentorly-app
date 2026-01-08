@@ -3,7 +3,6 @@ import 'dart:async';
 import 'onboarding_page.dart';
 import '../pelajar/dashboard_pelajar.dart';
 import '../mentor/dashboard_mentor.dart';
-import '../admin/dashboard_admin.dart';
 import '../utils/session_manager.dart';
 import '../services/notification_service.dart';
 
@@ -65,11 +64,6 @@ class _SplashScreenState extends State<SplashScreen> {
             MaterialPageRoute(
               builder: (context) => DashboardMentor(mentorData: userData),
             ),
-          );
-        } else if (userType == 'admin') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const DashboardAdmin()),
           );
         } else {
           Navigator.pushReplacement(

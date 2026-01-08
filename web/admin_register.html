@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrasi Admin - Mentorly</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .alert-info {
+            background: #e3f2fd;
+            color: #1565c0;
+            border-left: 4px solid #1976d2;
+        }
+
+        .alert-success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-left: 4px solid #4caf50;
+            display: none;
+        }
+
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #f44336;
+            display: none;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #444;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #777;
+            font-size: 12px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+            box-shadow: none;
+        }
+
+        .divider {
+            text-align: center;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e0e0e0;
+        }
+
+        .divider span {
+            background: white;
+            padding: 0 15px;
+            position: relative;
+            color: #999;
+            font-size: 13px;
+        }
+
+        .admin-list {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .admin-list h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .admin-item {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .admin-info {
+            flex: 1;
+        }
+
+        .admin-info .name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 3px;
+        }
+
+        .admin-info .email {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .admin-info .role {
+            display: inline-block;
+            padding: 3px 10px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .delete-btn {
+            padding: 8px 15px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .delete-btn:hover {
+            background: #d32f2f;
+        }
+
+        .loading {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .admin-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .delete-btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Registrasi Admin</h1>
+        <p class="subtitle">Kelola akses administrator untuk Mentorly</p>
+
+        <div class="alert alert-info">
+            <strong>⚠️ PENTING:</strong><br>
+            Halaman ini untuk mendaftarkan admin baru dengan username dan password. Data akan disimpan di Firebase Realtime Database node <code>admin</code>.
+        </div>
+
+        <div id="successAlert" class="alert alert-success"></div>
+        <div id="errorAlert" class="alert alert-error"></div>
+
+        <!-- Register Form -->
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" required placeholder="admin">
+                <small>Username untuk login (tanpa spasi, huruf kecil)</small>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" required placeholder="Minimal 6 karakter" minlength="6">
+                <small>Password harus minimal 6 karakter</small>
+            </div>
+
+            <button type="submit" class="btn" id="registerBtn">
+                📝 Daftarkan Admin
+            </button>
+        </form>
+
+        <div class="divider">
+            <span>ATAU</span>
+        </div>
+
+        <button class="btn btn-secondary" onclick="window.location.href='admin.html'">
+            🚪 Ke Dashboard Admin
+        </button>
+
+        <!-- Admin List -->
+        <div class="admin-list">
+            <h3>👥 Daftar Admin Terdaftar</h3>
+            <div id="adminList" class="loading">Memuat...</div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9txG910vGx5tjXD96plrcpqYs2F5Fmio",
+            authDomain: "mentorly-66d07.firebaseapp.com",
+            databaseURL: "https://mentorly-66d07-default-rtdb.firebaseio.com",
+            projectId: "mentorly-66d07",
+            storageBucket: "mentorly-66d07.firebasestorage.app",
+            messagingSenderId: "282188392920",
+            appId: "1:282188392920:web:e97364323797b0e802aaad",
+            measurementId: "G-BVVVBB8BWK"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Load existing admins
+        loadAdmins();
+
+        // Register Form Handler
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim().toLowerCase();
+            const password = document.getElementById('password').value;
+            
+            const registerBtn = document.getElementById('registerBtn');
+            const successAlert = document.getElementById('successAlert');
+            const errorAlert = document.getElementById('errorAlert');
+
+            registerBtn.disabled = true;
+            registerBtn.textContent = '⏳ Mendaftarkan...';
+            successAlert.style.display = 'none';
+            errorAlert.style.display = 'none';
+
+            try {
+                // Check if username already exists
+                const snapshot = await database.ref('admin')
+                    .orderByChild('username')
+                    .equalTo(username)
+                    .once('value');
+
+                if (snapshot.exists()) {
+                    throw new Error('Username sudah digunakan');
+                }
+
+                // Generate new ID
+                const newAdminRef = database.ref('admin').push();
+                
+                // Save admin data to database
+                await newAdminRef.set({
+                    id: parseInt(newAdminRef.key.substr(-8), 36), // Generate numeric ID from key
+                    username: username,
+                    password: password, // Note: In production, you should hash this
+                    created_at: new Date().toISOString().replace('T', ' ').substr(0, 19)
+                });
+
+                // Show success message
+                successAlert.textContent = `✅ Admin berhasil didaftarkan! Username: ${username}`;
+                successAlert.style.display = 'block';
+
+                // Reset form
+                document.getElementById('registerForm').reset();
+
+                // Reload admin list
+                loadAdmins();
+
+            } catch (error) {
+                console.error('Error registering admin:', error);
+                errorAlert.textContent = `❌ ${error.message}`;
+                errorAlert.style.display = 'block';
+            } finally {
+                registerBtn.disabled = false;
+                registerBtn.textContent = '📝 Daftarkan Admin';
+            }
+        });
+
+        // Load all registered admins
+        async function loadAdmins() {
+            const adminListDiv = document.getElementById('adminList');
+            
+            try {
+                const snapshot = await database.ref('admin').once('value');
+                
+                if (!snapshot.exists()) {
+                    adminListDiv.innerHTML = '<p style="color: #999; text-align: center;">Belum ada admin terdaftar</p>';
+                    return;
+                }
+
+                const admins = [];
+                snapshot.forEach(child => {
+                    const adminData = child.val();
+                    admins.push({
+                        key: child.key,
+                        ...adminData
+                    });
+                });
+
+                // Sort by created_at
+                admins.sort((a, b) => {
+                    const dateA = new Date(a.created_at);
+                    const dateB = new Date(b.created_at);
+                    return dateB - dateA;
+                });
+
+                adminListDiv.innerHTML = admins.map(admin => `
+                    <div class="admin-item">
+                        <div class="admin-info">
+                            <div class="name">Username: ${admin.username || 'N/A'}</div>
+                            <div class="email">ID: ${admin.id || 'N/A'}</div>
+                            <span class="role">👤 Admin</span>
+                        </div>
+                        <button class="delete-btn" onclick="deleteAdmin('${admin.key}', '${admin.username}')">
+                            🗑️ Hapus
+                        </button>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading admins:', error);
+                adminListDiv.innerHTML = '<p style="color: #f44336; text-align: center;">Gagal memuat daftar admin</p>';
+            }
+        }
+
+        // Delete admin
+        async function deleteAdmin(key, username) {
+            if (!confirm(`Hapus admin: ${username}?`)) {
+                return;
+            }
+
+            try {
+                await database.ref('admin').child(key).remove();
+                alert('✅ Admin berhasil dihapus!');
+                loadAdmins();
+            } catch (error) {
+                console.error('Error deleting admin:', error);
+                alert('❌ Gagal menghapus admin: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

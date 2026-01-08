@@ -6,17 +6,11 @@
     "rules": "storage.rules"
   },
   "hosting": {
-    "public": "build/web",
+    "public": "admin_web",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
     ]
   }
 }

@@ -15,10 +15,9 @@
       }
     },
     "admin": {
-      "$uid": {
-        ".read": "$uid === auth.uid",
-        ".write": "$uid === auth.uid"
-      }
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["username"]
     },
     "jadwal": {
       ".read": true,

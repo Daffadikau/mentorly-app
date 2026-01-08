@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../pelajar/login_pelajar.dart';
 import '../mentor/login_mentor.dart';
-import '../utils/debug_account_manager.dart';
-import '../utils/firebase_restore_utility.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
@@ -64,33 +62,6 @@ class WelcomePage extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                           builder: (context) => const LoginMentor()),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Debug button - Remove before production
-                  TextButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const DebugAccountManager()),
-                    ),
-                    icon: Icon(Icons.bug_report, color: Colors.grey[600]),
-                    label: Text(
-                      '🔧 Test Account Manager',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                    ),
-                  ),
-                  // Restore button - Emergency use only
-                  TextButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const FirebaseRestoreUtility()),
-                    ),
-                    icon: Icon(Icons.restore, color: Colors.red[400]),
-                    label: Text(
-                      '🚨 Firebase Restore',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                   ),
                   const SizedBox(height: 20),

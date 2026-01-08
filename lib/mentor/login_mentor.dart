@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'register_mentor.dart';
 import 'dashboard_mentor.dart';
 import '../utils/session_manager.dart';
-import '../common/api_config.dart';
 import '../services/notification_service.dart';
 
 class LoginMentor extends StatefulWidget {
@@ -383,60 +380,6 @@ class _LoginMentorState extends State<LoginMentor> {
         }
       }
 
-      // Legacy PHP fallback (if needed) - Commented out, using Firebase RTDB instead
-      /*
-      try {
-          final response = await http.post(
-            Uri.parse(ApiConfig.getUrl("login_mentor.php")),
-            body: {
-              'email': _email.text.trim().toLowerCase(),
-              'password': _password.text,
-            },
-          ).timeout(const Duration(seconds: 10));
-
-          if (response.statusCode == 200) {
-            final data = jsonDecode(response.body);
-
-            if (data['status'] == 'success') {
-              // PHP auth successful, create Firebase Auth account
-              print("✅ PHP authentication successful, creating Firebase account...");
-
-              try {
-                final newUserCredential = await FirebaseAuth.instance
-                    .createUserWithEmailAndPassword(
-                  email: _email.text.trim().toLowerCase(),
-                  password: _password.text,
-                );
-
-                uid = newUserCredential.user!.uid;
-                user = newUserCredential.user!;
-
-                // Send verification email
-                await user.sendEmailVerification();
-                print("✅ Firebase Auth account created, verification email sent");
-
-                isPhpAuth = true;
-              } catch (createError) {
-                print("❌ Failed to create Firebase account: $createError");
-                // If account creation fails, we can still proceed with PHP data
-                // Generate a temporary UID from email
-                uid = _email.text.trim().toLowerCase().hashCode.toString();
-                isPhpAuth = true;
-              }
-            } else {
-              // PHP auth also failed
-              throw Exception(data['message'] ?? 'Login gagal');
-            }
-          } else {
-            throw Exception('Server error');
-          }
-        } catch (phpError) {
-          print("❌ PHP authentication also failed: $phpError");
-          // Re-throw the original Firebase error
-          rethrow;
-        }
-      */
-
       // Check if email is verified (skip for admin-verified mentors)
       // isPhpAuth is set to true earlier if mentor is verified by admin
       print(
@@ -532,62 +475,16 @@ class _LoginMentorState extends State<LoginMentor> {
       bool isVerified = false;
 
       if (!snapshot.exists) {
-        // Profile doesn't exist in Firebase RTDB, check PHP backend
-        print(
-            "⚠️ Mentor profile not found in Firebase RTDB, checking PHP backend...");
+        // Profile doesn't exist in Firebase RTDB, create pending profile
+        print("⚠️ Mentor profile not found in Firebase RTDB, creating pending profile...");
 
-        try {
-          final response = await http.post(
-            Uri.parse(ApiConfig.getUrl("check_mentor_status.php")),
-            body: {
-              'uid': uid,
-              'email': _email.text.trim().toLowerCase(),
-            },
-          ).timeout(const Duration(seconds: 10));
-
-          if (response.statusCode == 200) {
-            final data = jsonDecode(response.body);
-            if (data['status'] == 'success' && data['verified'] == true) {
-              // Mentor is verified in PHP backend, sync to Firebase RTDB
-              mentorData = Map<String, dynamic>.from(data['mentor_data']);
-              mentorData['uid'] = uid;
-              mentorData['id'] = uid;
-
-              // Save to Firebase RTDB for future logins
-              await ref.set(mentorData);
-              isVerified = true;
-              print("✅ Mentor data synced from PHP backend to Firebase");
-            } else {
-              // Not verified in PHP backend either
-              mentorData = {
-                'email': _email.text.trim().toLowerCase(),
-                'uid': uid,
-                'created_at': DateTime.now().toIso8601String(),
-                'status_verifikasi': 'pending',
-              };
-              await ref.set(mentorData);
-            }
-          } else {
-            // PHP backend error, create pending profile
-            mentorData = {
-              'email': _email.text.trim().toLowerCase(),
-              'uid': uid,
-              'created_at': DateTime.now().toIso8601String(),
-              'status_verifikasi': 'pending',
-            };
-            await ref.set(mentorData);
-          }
-        } catch (e) {
-          print("❌ Error checking PHP backend: $e");
-          // Create pending profile as fallback
-          mentorData = {
-            'email': _email.text.trim().toLowerCase(),
-            'uid': uid,
-            'created_at': DateTime.now().toIso8601String(),
-            'status_verifikasi': 'pending',
-          };
-          await ref.set(mentorData);
-        }
+        mentorData = {
+          'email': _email.text.trim().toLowerCase(),
+          'uid': uid,
+          'created_at': DateTime.now().toIso8601String(),
+          'status_verifikasi': 'pending',
+        };
+        await ref.set(mentorData);
       } else {
         // Profile exists in Firebase RTDB
         mentorData = Map<String, dynamic>.from(snapshot.value as Map? ?? {});
@@ -597,37 +494,6 @@ class _LoginMentorState extends State<LoginMentor> {
         // Check if verified
         if (mentorData['status_verifikasi'] == 'verified') {
           isVerified = true;
-        } else {
-          // Not verified in Firebase, double-check PHP backend
-          print("⚠️ Not verified in Firebase RTDB, checking PHP backend...");
-          try {
-            final response = await http.post(
-              Uri.parse(ApiConfig.getUrl("check_mentor_status.php")),
-              body: {
-                'uid': uid,
-                'email': _email.text.trim().toLowerCase(),
-              },
-            ).timeout(const Duration(seconds: 10));
-
-            if (response.statusCode == 200) {
-              final data = jsonDecode(response.body);
-              if (data['status'] == 'success' && data['verified'] == true) {
-                // Update Firebase RTDB with verified status
-                mentorData['status_verifikasi'] = 'verified';
-                // Merge any additional data from PHP backend
-                if (data['mentor_data'] != null) {
-                  final phpData =
-                      Map<String, dynamic>.from(data['mentor_data']);
-                  mentorData.addAll(phpData);
-                }
-                await ref.update({'status_verifikasi': 'verified'});
-                isVerified = true;
-                print("✅ Mentor status synced from PHP backend");
-              }
-            }
-          } catch (e) {
-            print("❌ Error checking PHP backend: $e");
-          }
         }
       }
 

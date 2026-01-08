@@ -6,7 +6,6 @@ import '../common/chat_list.dart';
 import 'profile_pelajar.dart';
 import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
-import '../utils/clear_bookings.dart';
 import '../services/session_reminder_service.dart';
 import '../widgets/cached_circle_avatar.dart';
 
@@ -560,20 +559,6 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_forever,
-                              color: Colors.orange),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const ClearBookingsUtility(),
-                              ),
-                            );
-                          },
-                          tooltip: 'Clear Bookings',
                         ),
                         IconButton(
                           icon: const Icon(Icons.logout, color: Colors.red),

@@ -795,7 +795,11 @@ class _ChatRoomState extends State<ChatRoom> {
 
   // Build session info banner
   Widget _buildSessionInfoBanner() {
-    String status = _getSessionStatus();
+    // Check if booking is cancelled
+    String jadwalStatus = jadwalData?['status'] ?? 'unknown';
+    bool isCancelled = jadwalStatus == 'available'; // If status is 'available', it means cancelled
+    
+    String status = isCancelled ? 'cancelled' : _getSessionStatus();
     String mataPelajaran = jadwalData?['mata_pelajaran'] ?? 'Sesi Mentoring';
     String tanggal = bookingData!['tanggal'];
     String jamMulai = bookingData!['jam_mulai'];
@@ -814,6 +818,12 @@ class _ChatRoomState extends State<ChatRoom> {
     IconData statusIcon;
 
     switch (status) {
+      case 'cancelled':
+        statusColor = Colors.red[700]!;
+        bgColor = Colors.red[50]!;
+        statusText = 'Dibatalkan';
+        statusIcon = Icons.cancel;
+        break;
       case 'booked':
         statusColor = Colors.blue[700]!;
         bgColor = Colors.blue[50]!;
@@ -1126,20 +1136,21 @@ class _ChatRoomState extends State<ChatRoom> {
                     ),
                   Row(
                     children: [
-                      // Attachment button
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.attach_file,
-                            color: isUploading ? Colors.grey : Colors.blue[700],
+                      // Attachment button (only for mentor)
+                      if (widget.userType == 'mentor')
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            shape: BoxShape.circle,
                           ),
-                          onPressed: isUploading
-                              ? null
-                              : () {
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.attach_file,
+                              color: isUploading ? Colors.grey : Colors.blue[700],
+                            ),
+                            onPressed: isUploading
+                                ? null
+                                : () {
                                   showModalBottomSheet(
                                     context: context,
                                     backgroundColor: Colors.transparent,

@@ -185,13 +185,22 @@ class _ChatListPageState extends State<ChatListPage> {
                   if (jadwalSnapshot.exists) {
                     var jadwalData =
                         jadwalSnapshot.value as Map<dynamic, dynamic>;
-                    room['mata_pelajaran'] =
-                        jadwalData['mata_pelajaran'] ?? 'Sesi Mentoring';
-                    room['tanggal'] = booking['tanggal'] ?? '';
-                    room['jam_mulai'] = booking['jam_mulai'] ?? '';
-                    room['jam_selesai'] = booking['jam_selesai'] ?? '';
-                    print(
-                        '📚 Loaded mata pelajaran: ${room['mata_pelajaran']}');
+                    
+                    // Only show mata_pelajaran if booking is still active and accepted
+                    String jadwalStatus = jadwalData['status']?.toString() ?? '';
+                    bool bookingAccepted = jadwalData['booking_accepted'] == true;
+                    
+                    if (jadwalStatus == 'booked' && bookingAccepted) {
+                      room['mata_pelajaran'] =
+                          jadwalData['mata_pelajaran'] ?? 'Sesi Mentoring';
+                      room['tanggal'] = booking['tanggal'] ?? '';
+                      room['jam_mulai'] = booking['jam_mulai'] ?? '';
+                      room['jam_selesai'] = booking['jam_selesai'] ?? '';
+                      print(
+                          '📚 Loaded mata pelajaran: ${room['mata_pelajaran']}');
+                    } else {
+                      print('⚠️ Booking not active or not accepted yet');
+                    }
                   }
                   break; // Use first matching booking
                 }

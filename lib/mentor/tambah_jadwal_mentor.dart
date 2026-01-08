@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:intl/intl.dart';
 
 class TambahJadwalMentor extends StatefulWidget {
   final Map<String, dynamic> mentorData;
@@ -14,26 +15,41 @@ class _TambahJadwalMentorState extends State<TambahJadwalMentor> {
   final TextEditingController _mataPelajaranController =
       TextEditingController();
 
-  String selectedHari = 'Senin';
+  DateTime? selectedDate;
   TimeOfDay? jamMulai;
   TimeOfDay? jamSelesai;
 
   bool isLoading = false;
 
-  List<String> hariList = [
-    'Senin',
-    'Selasa',
-    'Rabu',
-    'Kamis',
-    'Jumat',
-    'Sabtu',
-    'Minggu'
-  ];
-
   @override
   void dispose() {
     _mataPelajaranController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.blue[700]!,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        selectedDate = picked;
+      });
+    }
   }
 
   Future<void> _selectTime(BuildContext context, bool isStartTime) async {
@@ -75,6 +91,11 @@ class _TambahJadwalMentorState extends State<TambahJadwalMentor> {
       return false;
     }
 
+    if (selectedDate == null) {
+      _showError("Pilih tanggal jadwal");
+      return false;
+    }
+
     if (jamMulai == null) {
       _showError("Pilih jam mulai");
       return false;
@@ -111,15 +132,23 @@ class _TambahJadwalMentorState extends State<TambahJadwalMentor> {
     });
 
     try {
-      final ref = FirebaseDatabase.instance.ref('jadwal_mentor');
+      final mentorUid = widget.mentorData['mentor_id'] ?? widget.mentorData['id'];
+      
+      // Format tanggal dalam ISO dan display format
+      final isoDate = DateFormat('yyyy-MM-dd').format(selectedDate!);
+      final displayDate = DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(selectedDate!);
+      
+      final ref = FirebaseDatabase.instance.ref('jadwal/$mentorUid');
       final newRef = ref.push();
 
       final jadwal = {
-        'mentor_id': widget.mentorData['mentor_id'] ?? widget.mentorData['id'],
+        'mentor_id': mentorUid,
         'mata_pelajaran': _mataPelajaranController.text.trim(),
-        'hari': selectedHari,
-        'jam_mulai': '${_formatTime(jamMulai!)}:00',
-        'jam_selesai': '${_formatTime(jamSelesai!)}:00',
+        'tanggal': isoDate, // ISO format untuk parsing
+        'display_date': displayDate, // Format display Indonesia
+        'jam_mulai': _formatTime(jamMulai!),
+        'jam_selesai': _formatTime(jamSelesai!),
+        'status': 'available',
         'created_at': DateTime.now().toIso8601String(),
       };
 
@@ -192,61 +221,50 @@ class _TambahJadwalMentorState extends State<TambahJadwalMentor> {
               ),
             ),
             const SizedBox(height: 15),
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Hari",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[700],
-                    ),
+            // Date Picker
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Tanggal",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
                   ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: hariList.map((hari) {
-                      bool isSelected = selectedHari == hari;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            selectedHari = hari;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.blue[700]
-                                : Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            hari,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.black87,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () => _selectDate(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 15,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          selectedDate != null
+                              ? DateFormat('EEEE, dd MMMM yyyy', 'id_ID')
+                                  .format(selectedDate!)
+                              : "Pilih tanggal",
+                          style: TextStyle(
+                            color: selectedDate != null
+                                ? Colors.black87
+                                : Colors.grey,
                           ),
                         ),
-                      );
-                    }).toList(),
+                        Icon(Icons.calendar_today, color: Colors.grey[600]),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             Row(

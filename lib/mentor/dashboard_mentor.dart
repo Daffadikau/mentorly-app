@@ -5,13 +5,13 @@ import '../common/welcome_page.dart';
 import '../utils/session_manager.dart';
 import 'profile_mentor.dart';
 import 'transaction_mentor.dart';
-import 'demo_add_earning.dart';
 import 'jadwal_mentor.dart';
 import 'riwayat_mengajar.dart';
 import '../common/chat_list.dart';
 import '../common/chat_room.dart';
 import 'tambah_kelas_mentor.dart';
 import 'daftar_kelas_mentor.dart';
+import 'kelola_booking_mentor.dart';
 
 class DashboardMentor extends StatefulWidget {
   final Map<String, dynamic> mentorData;
@@ -29,6 +29,12 @@ class _DashboardMentorState extends State<DashboardMentor> {
   final DatabaseReference _database = FirebaseDatabase.instance.ref();
   late PageController _pageController;
   int _selectedIndex = 0;
+  
+  // Real statistics
+  int totalKelas = 0;
+  int jadwalTersedia = 0;
+  int jadwalTerpesan = 0;
+  double realRating = 0.0;
 
   @override
   void initState() {
@@ -39,6 +45,7 @@ class _DashboardMentorState extends State<DashboardMentor> {
     loadJadwal();
     _loadMentorBalance();
     _loadLatestMentorData();
+    _loadStatistics();
   }
 
   @override
@@ -109,20 +116,140 @@ class _DashboardMentorState extends State<DashboardMentor> {
     }
   }
 
+  Future<void> _loadStatistics() async {
+    try {
+      final mentorUid = currentMentorData['uid'];
+      print('📊 Loading statistics for mentor: $mentorUid');
+      
+      // 1. Load total kelas - using manual filtering to avoid index requirement
+      int kelasCount = 0;
+      
+      final allKelasSnapshot = await _database.child('kelas').get();
+      
+      if (allKelasSnapshot.exists) {
+        final allKelasData = allKelasSnapshot.value as Map<dynamic, dynamic>;
+        print('  🔍 Total kelas in database: ${allKelasData.length}');
+        
+        for (var entry in allKelasData.entries) {
+          final kelas = entry.value as Map<dynamic, dynamic>;
+          final kelasMentorUid = kelas['mentor_uid']?.toString() ?? '';
+          
+          if (kelasMentorUid == mentorUid.toString()) {
+            kelasCount++;
+          }
+        }
+        
+        print('  ✅ Found $kelasCount kelas for mentor $mentorUid');
+      } else {
+        print('  ⚠️ No kelas found in database');
+      }
+      
+      // 2. Load jadwal statistics
+      final jadwalSnapshot = await _database
+          .child('jadwal')
+          .child(mentorUid)
+          .get();
+      
+      int tersedia = 0;
+      int terpesan = 0;
+      
+      if (jadwalSnapshot.exists) {
+        final jadwalData = jadwalSnapshot.value as Map<dynamic, dynamic>;
+        print('  ✓ Found ${jadwalData.length} total jadwal');
+        
+        for (var entry in jadwalData.entries) {
+          final jadwal = entry.value as Map<dynamic, dynamic>;
+          final status = jadwal['status']?.toString() ?? '';
+          
+          if (status == 'available') {
+            tersedia++;
+          } else if (status == 'booked') {
+            terpesan++;
+          }
+        }
+        print('  ✓ Jadwal available: $tersedia, booked: $terpesan');
+      } else {
+        print('  ⚠️ No jadwal found for mentor $mentorUid');
+      }
+      
+      // 3. Calculate real rating from bookings - using manual filtering
+      double totalRating = 0.0;
+      int reviewCount = 0;
+      
+      try {
+        final allBookingsSnapshot = await _database.child('bookings').get();
+        
+        if (allBookingsSnapshot.exists) {
+          final allBookingsData = allBookingsSnapshot.value as Map<dynamic, dynamic>;
+          print('  🔍 Total bookings in database: ${allBookingsData.length}');
+          
+          for (var entry in allBookingsData.entries) {
+            final booking = entry.value as Map<dynamic, dynamic>;
+            final bookingMentorId = booking['mentor_id']?.toString() ?? '';
+            
+            if (bookingMentorId == mentorUid.toString()) {
+              if (booking['rating'] != null) {
+                final rating = double.tryParse(booking['rating'].toString());
+                if (rating != null && rating > 0) {
+                  totalRating += rating;
+                  reviewCount++;
+                }
+              }
+            }
+          }
+          
+          print('  ✓ Found $reviewCount reviews for this mentor, total rating: $totalRating');
+        } else {
+          print('  ⚠️ No bookings found in database');
+        }
+      } catch (e) {
+        print('  ⚠️ Error loading bookings: $e');
+      }
+      
+      double avgRating = reviewCount > 0 ? totalRating / reviewCount : 0.0;
+      
+      if (mounted) {
+        setState(() {
+          totalKelas = kelasCount;
+          jadwalTersedia = tersedia;
+          jadwalTerpesan = terpesan;
+          realRating = avgRating;
+        });
+      }
+      
+      print('📊 Statistics loaded successfully:');
+      print('  - Kelas: $totalKelas');
+      print('  - Jadwal Tersedia: $jadwalTersedia');
+      print('  - Jadwal Terpesan: $jadwalTerpesan');
+      print('  - Rating: $realRating ($reviewCount reviews)');
+      
+    } catch (e) {
+      print('❌ Error loading statistics: $e');
+    }
+  }
+
   Future<void> loadJadwal() async {
     try {
       final mentorUid = currentMentorData['uid'];
+      print('📅 Loading jadwal for mentor: $mentorUid');
+      
       final snapshot = await _database.child('jadwal').child(mentorUid).get();
 
       if (snapshot.exists) {
         List<Map<String, dynamic>> tempList = [];
         final data = snapshot.value as Map<dynamic, dynamic>;
+        print('📅 Total jadwal found: ${data.length}');
 
         for (var entry in data.entries) {
           final key = entry.key;
           final value = entry.value;
 
           if (value is Map) {
+            final status = value['status'] ?? 'available';
+            final bookedBy = value['booked_by'] ?? '';
+            
+            print('📅 Jadwal $key: status=$status, booked_by=$bookedBy');
+            
             Map<String, dynamic> jadwalData = {
               'id': key,
               'mata_pelajaran': value['mata_pelajaran'] ?? '',
@@ -132,8 +259,8 @@ class _DashboardMentorState extends State<DashboardMentor> {
               'harga': value['harga'] ?? '',
               'deskripsi': value['deskripsi'] ?? '',
               'catatan': value['catatan'] ?? '',
-              'status': value['status'] ?? 'available',
-              'booked_by': value['booked_by'] ?? '',
+              'status': status,
+              'booked_by': bookedBy,
               'student_name': '',
             };
 
@@ -174,6 +301,11 @@ class _DashboardMentorState extends State<DashboardMentor> {
         tempList = tempList
             .where((j) => (j['status'] ?? 'available') == 'booked')
             .toList();
+        
+        print('📅 Booked sessions after filter: ${tempList.length}');
+        tempList.forEach((j) {
+          print('  - ${j['mata_pelajaran']} on ${j['tanggal']} at ${j['jam_mulai']} by ${j['student_name']}');
+        });
 
         // Urutkan berdasarkan waktu mulai (jika dapat diparse)
         tempList.sort((a, b) {
@@ -190,13 +322,16 @@ class _DashboardMentorState extends State<DashboardMentor> {
         setState(() {
           jadwalList = tempList;
         });
+        
+        print('✅ Final jadwalList count: ${jadwalList.length}');
       } else {
+        print('⚠️ No jadwal snapshot exists for mentor $mentorUid');
         setState(() {
           jadwalList = [];
         });
       }
     } catch (e) {
-      print('Error loading jadwal: $e');
+      print('❌ Error loading jadwal: $e');
       setState(() {
         jadwalList = [];
       });
@@ -333,15 +468,6 @@ class _DashboardMentorState extends State<DashboardMentor> {
 
   @override
   Widget build(BuildContext context) {
-    int totalSessions = jadwalList.where((j) => j['status'] == 'booked').length;
-    int availableSlots =
-        jadwalList.where((j) => j['status'] == 'available').length;
-    double earnings = double.tryParse(
-            currentMentorData['total_penghasilan']?.toString() ?? '0') ??
-        0;
-    double rating =
-        double.tryParse(currentMentorData['rating']?.toString() ?? '0') ?? 0;
-
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: PageView(
@@ -353,8 +479,7 @@ class _DashboardMentorState extends State<DashboardMentor> {
         },
         children: [
           // Halaman 0: Beranda
-          _buildBerandaPage(
-              context, totalSessions, availableSlots, earnings, rating),
+          _buildBerandaPage(context),
           // Halaman 1: Transaksi
           TransactionMentor(mentorData: currentMentorData),
           // Halaman 2: Chat
@@ -409,8 +534,7 @@ class _DashboardMentorState extends State<DashboardMentor> {
     );
   }
 
-  Widget _buildBerandaPage(BuildContext context, int totalSessions,
-      int availableSlots, double earnings, double rating) {
+  Widget _buildBerandaPage(BuildContext context) {
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -502,19 +626,6 @@ class _DashboardMentorState extends State<DashboardMentor> {
                     if (value == 'toggle_status') {
                       // Toggle active status
                       await _toggleActiveStatus();
-                    } else if (value == 'demo') {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DemoAddEarning(
-                            mentorUid: currentMentorData['uid'],
-                            mentorName: currentMentorData['nama_lengkap'],
-                          ),
-                        ),
-                      );
-                      if (result == true) {
-                        _loadMentorBalance();
-                      }
                     } else if (value == 'logout') {
                       await SessionManager.logout();
                       if (mounted) {
@@ -539,16 +650,6 @@ class _DashboardMentorState extends State<DashboardMentor> {
                           ),
                           const SizedBox(width: 8),
                           Text(isActive ? 'Set Non Active' : 'Set Active'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'demo',
-                      child: Row(
-                        children: [
-                          Icon(Icons.attach_money, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text('Demo Tambah Pemasukan'),
                         ],
                       ),
                     ),
@@ -593,17 +694,17 @@ class _DashboardMentorState extends State<DashboardMentor> {
                   children: [
                     Expanded(
                       child: _buildMiniStatCard(
-                        'Sesi',
-                        totalSessions.toString(),
-                        Icons.school_rounded,
+                        'Kelas',
+                        totalKelas.toString(),
+                        Icons.class_rounded,
                         Colors.purple,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildMiniStatCard(
-                        'Slot Tersedia',
-                        availableSlots.toString(),
+                        'Jadwal Tersedia',
+                        jadwalTersedia.toString(),
                         Icons.event_available_rounded,
                         Colors.green,
                       ),
@@ -616,7 +717,7 @@ class _DashboardMentorState extends State<DashboardMentor> {
                     Expanded(
                       child: _buildMiniStatCard(
                         'Rating',
-                        rating.toStringAsFixed(1),
+                        realRating > 0 ? realRating.toStringAsFixed(1) : '0.0',
                         Icons.star_rounded,
                         Colors.amber,
                       ),
@@ -624,9 +725,9 @@ class _DashboardMentorState extends State<DashboardMentor> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildMiniStatCard(
-                        'Penghasilan',
-                        'Rp ${NumberFormat('#,###', 'id_ID').format(earnings)}',
-                        Icons.account_balance_wallet_rounded,
+                        'Jadwal Terpesan',
+                        jadwalTerpesan.toString(),
+                        Icons.event_busy_rounded,
                         Colors.blue,
                       ),
                     ),
@@ -637,14 +738,14 @@ class _DashboardMentorState extends State<DashboardMentor> {
                   children: [
                     Expanded(
                       child: _buildQuickActionButton(
-                        'Jadwal',
-                        Icons.edit_calendar_rounded,
+                        'Kelola Booking',
+                        Icons.event_note_rounded,
                         Colors.blue,
                         () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => JadwalMentor(
+                              builder: (context) => KelolaBookingMentor(
                                 mentorData: currentMentorData,
                               ),
                             ),
@@ -687,14 +788,56 @@ class _DashboardMentorState extends State<DashboardMentor> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    const Spacer(),
+                    // Refresh button
+                    IconButton(
+                      icon: const Icon(Icons.refresh, size: 22),
+                      onPressed: () async {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Memuat ulang data...'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                        await loadJadwal();
+                        await _loadStatistics();
+                      },
+                      tooltip: 'Refresh Data',
+                    ),
                   ],
                 ),
                 const SizedBox(height: 15),
                 jadwalList.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: Text("Belum ada jadwal mengajar"),
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.calendar_today_outlined,
+                                size: 48,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                "Belum ada sesi yang dipesan",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "Sesi yang sudah dipesan oleh pelajar akan muncul di sini",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       )
                     : ListView.builder(
@@ -703,11 +846,16 @@ class _DashboardMentorState extends State<DashboardMentor> {
                         itemCount: jadwalList.length,
                         itemBuilder: (context, index) {
                           var jadwal = jadwalList[index];
-                          final tanggal =
-                              _parseDateFlexible(jadwal['tanggal'] ?? '');
+                          final tanggalString = jadwal['tanggal'] ?? '';
+                          final tanggal = _parseDateFlexible(tanggalString);
+                          
+                          // Skip jika tanggal tidak valid (tapi log untuk debug)
                           if (tanggal == null) {
-                            return const SizedBox.shrink();
+                            print('⚠️ Skipping jadwal with invalid date: id=${jadwal['id']}, tanggal="$tanggalString", subject=${jadwal['mata_pelajaran']}');
+                            // Tetap tampilkan card dengan tanggal placeholder
+                            // return const SizedBox.shrink();
                           }
+                          
                           final baseStatus = jadwal['status'] ?? 'available';
                           final derivedStatus =
                               jadwal['computed_status'] ?? baseStatus;
@@ -740,7 +888,9 @@ class _DashboardMentorState extends State<DashboardMentor> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      DateFormat('dd').format(tanggal),
+                                      tanggal != null 
+                                          ? DateFormat('dd').format(tanggal)
+                                          : '??',
                                       style: TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.bold,
@@ -756,7 +906,9 @@ class _DashboardMentorState extends State<DashboardMentor> {
                                       ),
                                     ),
                                     Text(
-                                      DateFormat('MMM').format(tanggal),
+                                      tanggal != null 
+                                          ? DateFormat('MMM').format(tanggal)
+                                          : 'TBD',
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: isOngoing
@@ -774,8 +926,10 @@ class _DashboardMentorState extends State<DashboardMentor> {
                                 ),
                               ),
                               title: Text(
-                                DateFormat('EEEE, dd MMMM yyyy', 'id_ID')
-                                    .format(tanggal),
+                                tanggal != null
+                                    ? DateFormat('EEEE, dd MMMM yyyy', 'id_ID')
+                                        .format(tanggal)
+                                    : 'Tanggal belum ditentukan',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold),
                               ),

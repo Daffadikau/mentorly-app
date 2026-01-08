@@ -243,8 +243,61 @@ class _DetailMentorState extends State<DetailMentor> {
           await FirebaseDatabase.instance.ref('chat_rooms').child(roomId).get();
 
       if (snapshot.exists) {
+        // Check if booking is accepted by checking jadwal
+        bool bookingAccepted = false;
+        
+        // Check all jadwal for this mentor to find accepted booking
+        final jadwalSnapshot = await FirebaseDatabase.instance
+            .ref('jadwal/$mentorUid')
+            .get();
+            
+        if (jadwalSnapshot.exists) {
+          Map<dynamic, dynamic> jadwalMap = jadwalSnapshot.value as Map<dynamic, dynamic>;
+          
+          for (var entry in jadwalMap.entries) {
+            Map<String, dynamic> jadwal = Map<String, dynamic>.from(entry.value as Map);
+            
+            if (jadwal['booked_by'] == pelajarUid && 
+                jadwal['status'] == 'booked' &&
+                jadwal['booking_accepted'] == true) {
+              
+              // Check if session hasn't ended + 1 hour
+              String? tanggal = jadwal['tanggal'];
+              String? jamSelesai = jadwal['jam_selesai'];
+              
+              if (tanggal != null && jamSelesai != null) {
+                try {
+                  DateTime sessionDate = DateTime.parse(tanggal);
+                  List<String> timeParts = jamSelesai.split(':');
+                  
+                  DateTime sessionEnd = DateTime(
+                    sessionDate.year,
+                    sessionDate.month,
+                    sessionDate.day,
+                    int.parse(timeParts[0]),
+                    int.parse(timeParts[1]),
+                  );
+                  
+                  DateTime cutoffTime = sessionEnd.add(const Duration(hours: 1));
+                  
+                  if (DateTime.now().isBefore(cutoffTime)) {
+                    bookingAccepted = true;
+                    break;
+                  }
+                } catch (e) {
+                  print('❌ Error parsing session time: $e');
+                }
+              } else {
+                // No time restriction if date not set
+                bookingAccepted = true;
+                break;
+              }
+            }
+          }
+        }
+        
         setState(() {
-          chatRoomId = roomId;
+          chatRoomId = bookingAccepted ? roomId : null;
           hasBooked = true;
         });
       }
@@ -274,13 +327,34 @@ class _DetailMentorState extends State<DetailMentor> {
       final roomId = '${pelajarUid}_$mentorUid';
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
+      print('🔄 Preparing booking data...');
+      // Get ISO date string from scheduled_date for proper date storage
+      String isoDate = '';
+      String displayDate = '';
+      if (selectedJadwal!['scheduled_date'] != null) {
+        DateTime scheduledDate = selectedJadwal!['scheduled_date'] as DateTime;
+        isoDate = DateFormat('yyyy-MM-dd').format(scheduledDate);
+        displayDate = DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(scheduledDate);
+      } else {
+        // Fallback to current date if scheduled_date is not available
+        isoDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        displayDate = DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(DateTime.now());
+      }
+      print('📅 Booking date: $isoDate ($displayDate)');
+
       print('🔄 Updating jadwal status...');
-      // Update jadwal status to booked
+      // Update jadwal status to booked AND save the booking date
       await FirebaseDatabase.instance
           .ref('jadwal')
           .child(mentorUid)
           .child(selectedJadwal!['id'])
-          .update({'status': 'booked', 'booked_by': pelajarUid});
+          .update({
+            'status': 'booked', 
+            'booked_by': pelajarUid,
+            'tanggal': isoDate,  // Save the actual booking date
+            'display_date': displayDate,  // Human readable date
+          });
+      print('✅ Jadwal updated with date: $isoDate');
 
       print('🔄 Creating chat room...');
       // Create chat room - ensure IDs are strings
@@ -302,12 +376,11 @@ class _DetailMentorState extends State<DetailMentor> {
           (widget.mentorData['nama_lengkap'] ?? 'Mentor').toString();
         String pelajarName =
           (widget.pelajarData['nama_lengkap'] ?? 'Pelajar').toString();
-        String tanggal = (selectedJadwal!['display_date'] ?? '-').toString();
         String jamMulai = (selectedJadwal!['jam_mulai'] ?? '-').toString();
 
         String welcomeMessage =
           'Hai $pelajarName! Saya $mentorName, dan di sesi kali ini saya akan menjadi mentor Anda. '
-          'Kita akan melakukan sesi mentoring pada $tanggal pukul $jamMulai. '
+          'Kita akan melakukan sesi mentoring pada $displayDate pukul $jamMulai. '
           'Saya siap membantu Anda mencapai tujuan belajar. Jangan ragu untuk bertanya kapan saja! 😊🚀';
 
       await FirebaseDatabase.instance.ref('messages').child(roomId).push().set({
@@ -326,17 +399,7 @@ class _DetailMentorState extends State<DetailMentor> {
       });
 
       print('🔄 Saving booking record...');
-      // Save booking record
-      // Get ISO date string from scheduled_date for proper date storage
-      String isoDate = '';
-      if (selectedJadwal!['scheduled_date'] != null) {
-        DateTime scheduledDate = selectedJadwal!['scheduled_date'] as DateTime;
-        isoDate = DateFormat('yyyy-MM-dd').format(scheduledDate);
-      } else {
-        // Fallback to current date if scheduled_date is not available
-        isoDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      }
-
+      // Save booking record with the date we already calculated above
       await FirebaseDatabase.instance.ref('bookings').push().set({
         'pelajar_id': pelajarUid,
         'pelajar_name': widget.pelajarData['nama_lengkap'] ?? 'Pelajar',
@@ -344,12 +407,14 @@ class _DetailMentorState extends State<DetailMentor> {
         'mentor_name': widget.mentorData['nama_lengkap'] ?? 'Mentor',
         'jadwal_id': selectedJadwal!['id'],
         'tanggal': isoDate, // ISO date format for proper parsing
+        'display_date': displayDate, // Human readable date
         'jam_mulai': selectedJadwal!['jam_mulai'],
         'jam_selesai': selectedJadwal!['jam_selesai'],
         'harga': widget.mentorData['harga_per_jam'] ?? 0,
         'status': 'confirmed',
         'created_at': timestamp,
       });
+      print('✅ Booking saved with date: $isoDate');
 
       // Send booking notification to mentor
       try {
