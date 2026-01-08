@@ -105,6 +105,7 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                 tempList.add(mentor);
                 print(
                     '  ✓ Loaded: ${mentor['nama_lengkap']} (verified & active) - Kelas: ${mentor['kelas_categories']}');
+                print('     📋 Keahlian fields: keahlian=${mentor['keahlian']}, bidang_keahlian=${mentor['bidang_keahlian']}, keahlian_utama=${mentor['keahlian_utama']}');
               } else {
                 print(
                     '  ✗ Skipped: ${mentor['nama_lengkap']} (verified: $isVerified, active: $isActive)');
@@ -754,13 +755,25 @@ class _DashboardPelajarState extends State<DashboardPelajar> {
                                                   ],
                                                 ),
                                                 const SizedBox(height: 5),
-                                                Text(
-                                                  mentor['bidang_keahlian'] ??
-                                                      'Bidang tidak tersedia',
-                                                  style: TextStyle(
-                                                    color: Colors.grey[600],
-                                                    fontSize: 13,
-                                                  ),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.school,
+                                                      size: 16,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                    const SizedBox(width: 5),
+                                                    Text(
+                                                      mentor['keahlian'] ?? 
+                                                          mentor['keahlian_utama'] ??
+                                                          mentor['bidang_keahlian'] ??
+                                                          'Bidang tidak tersedia',
+                                                      style: TextStyle(
+                                                        color: Colors.grey[600],
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ],
                                             ),

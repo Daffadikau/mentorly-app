@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Encryption</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+    <h1>Test Encryption/Decryption</h1>
+    <div id="output"></div>
+
+    <script>
+        const ENCRYPTION_KEY = 'z3P9bV7xR2mN5qA8kL4jH1sD6fG0tY9u'; // 32 bytes
+        const ENCRYPTION_IV = 'a1b2c3d4e5f6g7h8';  // 16 bytes
+        
+        // Test data
+        const testTelepon = '081234567890';
+        const testNIK = '3173012312312322';
+        
+        function encryptData(plaintext) {
+            const key = CryptoJS.enc.Utf8.parse(ENCRYPTION_KEY);
+            const iv = CryptoJS.enc.Utf8.parse(ENCRYPTION_IV);
+            
+            const encrypted = CryptoJS.AES.encrypt(plaintext, key, {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            });
+            
+            return encrypted.toString();
+        }
+        
+        function decryptData(encryptedText) {
+            try {
+                const key = CryptoJS.enc.Utf8.parse(ENCRYPTION_KEY);
+                const iv = CryptoJS.enc.Utf8.parse(ENCRYPTION_IV);
+                
+                const decrypted = CryptoJS.AES.decrypt(encryptedText, key, {
+                    iv: iv,
+                    mode: CryptoJS.mode.CBC,
+                    padding: CryptoJS.pad.Pkcs7
+                });
+                
+                return decrypted.toString(CryptoJS.enc.Utf8);
+            } catch (error) {
+                return 'ERROR: ' + error.message;
+            }
+        }
+        
+        // Test encryption and decryption
+        const output = document.getElementById('output');
+        
+        output.innerHTML += '<h2>Testing Telepon</h2>';
+        output.innerHTML += '<p><strong>Original:</strong> ' + testTelepon + '</p>';
+        
+        const encryptedTelepon = encryptData(testTelepon);
+        output.innerHTML += '<p><strong>Encrypted:</strong> ' + encryptedTelepon + '</p>';
+        
+        const decryptedTelepon = decryptData(encryptedTelepon);
+        output.innerHTML += '<p><strong>Decrypted:</strong> ' + decryptedTelepon + '</p>';
+        output.innerHTML += '<p><strong>Match:</strong> ' + (testTelepon === decryptedTelepon ? '✅ YES' : '❌ NO') + '</p>';
+        
+        output.innerHTML += '<hr>';
+        output.innerHTML += '<h2>Testing NIK</h2>';
+        output.innerHTML += '<p><strong>Original:</strong> ' + testNIK + '</p>';
+        
+        const encryptedNIK = encryptData(testNIK);
+        output.innerHTML += '<p><strong>Encrypted:</strong> ' + encryptedNIK + '</p>';
+        
+        const decryptedNIK = decryptData(encryptedNIK);
+        output.innerHTML += '<p><strong>Decrypted:</strong> ' + decryptedNIK + '</p>';
+        output.innerHTML += '<p><strong>Match:</strong> ' + (testNIK === decryptedNIK ? '✅ YES' : '❌ NO') + '</p>';
+        
+        // Test dengan data dari Firebase (paste encrypted data dari console)
+        output.innerHTML += '<hr>';
+        output.innerHTML += '<h2>Test dengan data Firebase</h2>';
+        output.innerHTML += '<p>Paste encrypted data dari Firebase di console dan test:</p>';
+        output.innerHTML += '<pre>const result = decryptData("PASTE_ENCRYPTED_DATA_HERE");</pre>';
+    </script>
+</body>
+</html>

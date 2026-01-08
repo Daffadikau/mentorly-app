@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'login_mentor.dart';
+import '../security/encryption_helper.dart';
 
 class RegisterMentor extends StatefulWidget {
   const RegisterMentor({super.key});
@@ -270,12 +271,25 @@ class _RegisterMentorState extends State<RegisterMentor> {
       print("💾 Saving to Firebase RTDB...");
       final ref = FirebaseDatabase.instance.ref('mentors').child(uid);
 
+      // Enkripsi dan test dekripsi
+      final encryptedNIK = EncryptionHelper.encryptData(_nik.text.trim());
+      final encryptedTelepon = EncryptionHelper.encryptData(_telepon.text.trim());
+      
+      // Test dekripsi untuk memastikan enkripsi benar
+      print('🧪 Testing decryption...');
+      final decryptedNIK = EncryptionHelper.decryptData(encryptedNIK);
+      final decryptedTelepon = EncryptionHelper.decryptData(encryptedTelepon);
+      print('✅ NIK: ${_nik.text.trim()} -> $encryptedNIK -> $decryptedNIK');
+      print('✅ Telepon: ${_telepon.text.trim()} -> $encryptedTelepon -> $decryptedTelepon');
+
       final mentor = {
         'uid': uid,
         'nama_lengkap': _namaLengkap.text.trim(),
         'email': _email.text.trim().toLowerCase(),
-        'nik': _nik.text.trim(),
-        'telepon': _telepon.text.trim(),
+        // --- ENKRIPSI DATA SENSITIF ---
+        'nik': encryptedNIK,
+        'telepon': encryptedTelepon,
+        // ------------------------------
         'keahlian': selectedKeahlian,
         'kelamin': selectedKelamin,
         'keahlian_lain': _keahlianLain.text.trim(),
@@ -301,9 +315,10 @@ class _RegisterMentorState extends State<RegisterMentor> {
           context: context,
           barrierDismissible: false,
           builder: (context) => AlertDialog(
-            title: const Text("Verifikasi Email"),
-            content: Text(
-                "Link verifikasi telah dikirim ke ${_email.text}. Silakan cek email Anda untuk mengaktifkan akun."),
+            title: const Text("Registrasi Berhasil"),
+            content: const Text(
+              "Data Anda telah kami terima. Mohon menunggu tim kami melakukan verifikasi berkas. Silakan cek akun Anda secara berkala dalam 1x24 jam.",
+            ),
             actions: [
               TextButton(
                 onPressed: () {
@@ -314,7 +329,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
                         builder: (context) => const LoginMentor()),
                   );
                 },
-                child: const Text("Ke Halaman Login"),
+                child: const Text("Kembali ke Login"),
               ),
             ],
           ),

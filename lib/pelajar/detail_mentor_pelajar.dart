@@ -1360,27 +1360,6 @@ class _DetailMentorState extends State<DetailMentor> {
 
                   const SizedBox(height: 25),
                   const Text(
-                    "Keahlian",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      _buildSkillChip(
-                          widget.mentorData['bidang_keahlian'] ?? 'Umum'),
-                      if (widget.mentorData['pengalaman'] != null &&
-                          widget.mentorData['pengalaman'].toString().isNotEmpty)
-                        _buildSkillChip(
-                            '${widget.mentorData['pengalaman']} tahun'),
-                    ],
-                  ),
-                  const SizedBox(height: 25),
-                  const Text(
                     "Tentang Mentor",
                     style: TextStyle(
                       fontSize: 18,

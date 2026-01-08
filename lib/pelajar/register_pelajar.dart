@@ -68,15 +68,51 @@ class _RegisterPageState extends State<RegisterPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
-      print('📱 Starting phone verification for: ${_phone.text}');
+      print('🔄 Starting phone verification for: ${_phone.text}');
 
-      // Start phone verification
+      // Normalize phone number dan check apakah test number
+      final normalizedPhone = _phone.text.trim().replaceAll(
+        RegExp(r'[\s\-\(\)]'),
+        '',
+      );
+      const Map<String, String> TEST_NUMBERS = {
+        '+628132063163': '238767', // +62 813-2063-2163
+        '+628121514898': '445421', // +62 812-1514-4898
+      };
+
+      final isTestMode = TEST_NUMBERS.containsKey(normalizedPhone);
+
+      if (isTestMode) {
+        // Test mode - skip actual Firebase phone verification
+        Navigator.pop(context); // Close loading dialog
+
+        print('🧪 Using test mode for phone verification');
+
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PhoneVerificationPage(
+              phoneNumber: _phone.text.trim(),
+              verificationId: 'test_verification_id', // Dummy ID
+              email: _email.text.trim().toLowerCase(),
+              password: _password.text,
+              additionalData: {'phone': _phone.text.trim()},
+              isTestMode: true, // Enable test mode
+            ),
+          ),
+        );
+
+        if (result != null && result['success'] == true) {
+          await _completeRegistration(null, result);
+        }
+        return;
+      }
+
+      // Normal Firebase phone verification untuk nomor non-test
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: _phone.text.trim(),
         timeout: const Duration(seconds: 60),
@@ -102,9 +138,9 @@ class _RegisterPageState extends State<RegisterPage> {
             errorMessage = 'Error: ${e.message}';
           }
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMessage)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(errorMessage)));
         },
         codeSent: (String verificationId, int? resendToken) async {
           print('📨 Verification code sent');
@@ -119,9 +155,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 verificationId: verificationId,
                 email: _email.text.trim().toLowerCase(),
                 password: _password.text,
-                additionalData: {
-                  'phone': _phone.text.trim(),
-                },
+                additionalData: {'phone': _phone.text.trim()},
+                isTestMode: false, // Normal mode
               ),
             ),
           );
@@ -139,9 +174,9 @@ class _RegisterPageState extends State<RegisterPage> {
       print('❌ Error starting phone verification: $e');
       Navigator.pop(context); // Close loading dialog
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Terjadi kesalahan: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
     }
   }
 

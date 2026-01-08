@@ -44,11 +44,11 @@ class _ProfileMentorState extends State<ProfileMentor> {
     _emailController = TextEditingController(text: widget.mentorData['email']);
     _passwordController = TextEditingController();
     _keahlianUtamaController =
-        TextEditingController(text: widget.mentorData['keahlian_utama'] ?? '');
+        TextEditingController(text: widget.mentorData['keahlian'] ?? widget.mentorData['keahlian_utama'] ?? '');
     _keahlianLainController =
         TextEditingController(text: widget.mentorData['keahlian_lain'] ?? '');
     _linkedinController =
-        TextEditingController(text: widget.mentorData['linkedin_url'] ?? '');
+        TextEditingController(text: widget.mentorData['linkedin'] ?? widget.mentorData['linkedin_url'] ?? '');
     _deskripsiController =
         TextEditingController(text: widget.mentorData['deskripsi'] ?? '');
   }
@@ -530,7 +530,7 @@ class _ProfileMentorState extends State<ProfileMentor> {
                   _buildTextField(
                     "Keahlian Utama",
                     _keahlianUtamaController,
-                    Icons.school_outlined,
+                    Icons.school,
                   ),
                   const SizedBox(height: 20),
 
