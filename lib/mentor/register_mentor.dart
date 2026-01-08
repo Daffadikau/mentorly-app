@@ -21,6 +21,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
   final TextEditingController _password = TextEditingController();
   final TextEditingController _confirmPassword = TextEditingController();
   final TextEditingController _nik = TextEditingController();
+  final TextEditingController _telepon = TextEditingController();
   final TextEditingController _keahlianLain = TextEditingController();
   final TextEditingController _linkedin = TextEditingController();
 
@@ -50,6 +51,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
     _password.dispose();
     _confirmPassword.dispose();
     _nik.dispose();
+    _telepon.dispose();
     _keahlianLain.dispose();
     _linkedin.dispose();
     super.dispose();
@@ -98,6 +100,21 @@ class _RegisterMentorState extends State<RegisterMentor> {
 
     if (_nik.text.trim().isEmpty) {
       _showError("NIK tidak boleh kosong");
+      return false;
+    }
+
+    if (_nik.text.trim().length != 16) {
+      _showError("NIK harus 16 digit");
+      return false;
+    }
+
+    if (_telepon.text.trim().isEmpty) {
+      _showError("Nomor telepon tidak boleh kosong");
+      return false;
+    }
+
+    if (_telepon.text.trim().length < 10) {
+      _showError("Nomor telepon minimal 10 digit");
       return false;
     }
 
@@ -210,6 +227,8 @@ class _RegisterMentorState extends State<RegisterMentor> {
       isLoading = true;
     });
 
+    User? createdUser;
+    
     try {
       print("🔄 Starting registration...");
 
@@ -223,6 +242,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
 
       final uid = userCredential.user!.uid;
       final user = userCredential.user!;
+      createdUser = user; // Store for rollback if needed
       print("✅ Firebase Auth account created: $uid");
 
       // 1. Send Email Verification
@@ -255,6 +275,7 @@ class _RegisterMentorState extends State<RegisterMentor> {
         'nama_lengkap': _namaLengkap.text.trim(),
         'email': _email.text.trim().toLowerCase(),
         'nik': _nik.text.trim(),
+        'telepon': _telepon.text.trim(),
         'keahlian': selectedKeahlian,
         'kelamin': selectedKelamin,
         'keahlian_lain': _keahlianLain.text.trim(),
@@ -315,7 +336,20 @@ class _RegisterMentorState extends State<RegisterMentor> {
       }
       _showError(errorMessage);
     } catch (e) {
-      _showError("Terjadi kesalahan: $e");
+      // ROLLBACK: Delete Firebase Auth account if upload/save failed
+      if (createdUser != null) {
+        try {
+          print("🔄 Rolling back - deleting Firebase Auth account...");
+          await createdUser.delete();
+          print("✅ Firebase Auth account deleted (rollback)");
+          _showError("Registrasi gagal dan dibatalkan. Silakan coba lagi.");
+        } catch (deleteError) {
+          print("❌ Failed to delete user during rollback: $deleteError");
+          _showError("Registrasi gagal: $e\nHarap hubungi admin untuk menghapus akun.");
+        }
+      } else {
+        _showError("Terjadi kesalahan: $e");
+      }
       print("DEBUG ERROR: $e"); // Print to console for details
     } finally {
       if (mounted) {
@@ -360,6 +394,13 @@ class _RegisterMentorState extends State<RegisterMentor> {
               "3173012312312322",
               TextInputType.number,
               maxLength: 16,
+            ),
+            const SizedBox(height: 15),
+            _buildTextField(
+              "Nomor Telepon/WhatsApp *",
+              _telepon,
+              "081234567890",
+              TextInputType.phone,
             ),
             const SizedBox(height: 15),
             _buildTextField(

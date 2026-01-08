@@ -737,6 +737,7 @@
 
                 console.log('✅ Total pelajar loaded:', pelajarList.length);
                 renderPelajar();
+                updateStats(); // Update stats after loading
             } catch (error) {
                 console.error('❌ Error loading pelajar:', error);
                 document.getElementById('pelajarList').innerHTML = 
@@ -772,13 +773,13 @@
                     </div>
                     <div class="mentor-details">
                         <div class="detail-item">
-                            <strong>Phone:</strong> ${mentor.phone || 'N/A'}
+                            <strong>Telepon:</strong> ${mentor.telepon || 'N/A'}
                         </div>
                         <div class="detail-item">
-                            <strong>Mata Pelajaran:</strong> ${mentor.mata_pelajaran || 'N/A'}
+                            <strong>NIK:</strong> ${mentor.nik || 'N/A'}
                         </div>
                         <div class="detail-item">
-                            <strong>Pengalaman:</strong> ${mentor.pengalaman || 'N/A'} tahun
+                            <strong>Keahlian:</strong> ${mentor.keahlian || 'N/A'}
                         </div>
                     </div>
                     <div class="action-buttons">
@@ -815,13 +816,13 @@
                     </div>
                     <div class="mentor-details">
                         <div class="detail-item">
-                            <strong>Phone:</strong> ${mentor.phone || 'N/A'}
+                            <strong>Telepon:</strong> ${mentor.telepon || 'N/A'}
                         </div>
                         <div class="detail-item">
-                            <strong>Mata Pelajaran:</strong> ${mentor.mata_pelajaran || 'N/A'}
+                            <strong>NIK:</strong> ${mentor.nik || 'N/A'}
                         </div>
                         <div class="detail-item">
-                            <strong>Pengalaman:</strong> ${mentor.pengalaman || 'N/A'} tahun
+                            <strong>Keahlian:</strong> ${mentor.keahlian || 'N/A'}
                         </div>
                     </div>
                     <div class="action-buttons">
@@ -967,8 +968,16 @@
                             <p>${mentor.email || 'N/A'}</p>
                         </div>
                         <div class="detail-field">
-                            <label>Phone</label>
-                            <p>${mentor.phone || 'N/A'}</p>
+                            <label>Telepon/WhatsApp</label>
+                            <p>${mentor.telepon || 'N/A'}</p>
+                        </div>
+                        <div class="detail-field">
+                            <label>NIK</label>
+                            <p>${mentor.nik || 'N/A'}</p>
+                        </div>
+                        <div class="detail-field">
+                            <label>Kelamin</label>
+                            <p>${mentor.kelamin || 'N/A'}</p>
                         </div>
                         <div class="detail-field">
                             <label>UID</label>
@@ -981,12 +990,16 @@
                     <h3>Informasi Mentor</h3>
                     <div class="detail-grid">
                         <div class="detail-field">
-                            <label>Mata Pelajaran</label>
-                            <p>${mentor.mata_pelajaran || 'N/A'}</p>
+                            <label>Keahlian</label>
+                            <p>${mentor.keahlian || 'N/A'}</p>
                         </div>
                         <div class="detail-field">
-                            <label>Pengalaman</label>
-                            <p>${mentor.pengalaman || 'N/A'} tahun</p>
+                            <label>Keahlian Lain</label>
+                            <p>${mentor.keahlian_lain || '-'}</p>
+                        </div>
+                        <div class="detail-field">
+                            <label>LinkedIn</label>
+                            <p>${mentor.linkedin ? `<a href="${mentor.linkedin}" target="_blank" style="color: #1976d2;">${mentor.linkedin}</a>` : '-'}</p>
                         </div>
                         <div class="detail-field">
                             <label>Status</label>
@@ -997,6 +1010,46 @@
                             <p>${kelasList.length} kelas</p>
                         </div>
                     </div>
+                </div>
+
+                <div class="detail-section">
+                    <h3>Dokumen Kredensial</h3>
+                    <div class="detail-grid">
+                        ${mentor.url_ktp ? `
+                        <div class="detail-field">
+                            <label>KTP</label>
+                            <a href="${mentor.url_ktp}" target="_blank" style="color: #1976d2; text-decoration: none;">
+                                📄 Lihat KTP
+                            </a>
+                        </div>
+                        ` : ''}
+                        ${mentor.url_skck ? `
+                        <div class="detail-field">
+                            <label>SKCK</label>
+                            <a href="${mentor.url_skck}" target="_blank" style="color: #1976d2; text-decoration: none;">
+                                📄 Lihat SKCK
+                            </a>
+                        </div>
+                        ` : ''}
+                        ${mentor.url_pendidikan ? `
+                        <div class="detail-field">
+                            <label>Ijazah/Pendidikan</label>
+                            <a href="${mentor.url_pendidikan}" target="_blank" style="color: #1976d2; text-decoration: none;">
+                                📄 Lihat Ijazah
+                            </a>
+                        </div>
+                        ` : ''}
+                        ${mentor.url_sertifikat ? `
+                        <div class="detail-field">
+                            <label>Sertifikat</label>
+                            <a href="${mentor.url_sertifikat}" target="_blank" style="color: #1976d2; text-decoration: none;">
+                                📄 Lihat Sertifikat
+                            </a>
+                        </div>
+                        ` : ''}
+                    </div>
+                    ${!mentor.url_ktp && !mentor.url_skck && !mentor.url_pendidikan && !mentor.url_sertifikat ? 
+                        '<p style="color: #999; font-style: italic;">Tidak ada dokumen yang diupload</p>' : ''}
                 </div>
 
                 ${kelasList.length > 0 ? `

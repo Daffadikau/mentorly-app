@@ -4,13 +4,13 @@
       ".read": true,
       "$uid": {
         ".read": true,
-        ".write": "$uid === auth.uid || root.child('admin').child(auth.uid).exists()"
+        ".write": true
       }
     },
     "pelajar": {
-      ".read": "auth != null",
+      ".read": true,
       "$uid": {
-        ".read": "$uid === auth.uid || root.child('admin').child(auth.uid).exists()",
+        ".read": true,
         ".write": "$uid === auth.uid || root.child('admin').child(auth.uid).exists()"
       }
     },
